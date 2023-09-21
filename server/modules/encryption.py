@@ -14,3 +14,9 @@ def create_key_pair():
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
     return private_key, public_key
+
+"""
+def encrypt_packet(data, key):
+    
+def encrypt_chat(data, key):
+"""
