@@ -10,9 +10,7 @@ def decrypt_creds(fkey, workingdir):
     with open(f'{workingdir}/creds/db', 'rb') as f:
         data = f.read()
     decrypted = fkey.decrypt(data)
-    dict = decrypted.decode('utf8')
-    dict = dict.replace("'", "\"")
-    dict = loads(dict)
+    dict = loads(decrypted.decode('utf-8').replace('"', "\\\"").replace("'", "\""))
     setattr(db, 'con', sqltor.connect(host = dict['host'], user = dict['user'], passwd = dict['passwd']))
     setattr(db, 'cur', db.con.cursor())
 

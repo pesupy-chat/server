@@ -38,18 +38,6 @@ def setup_server_dir():
 
     return spath
 
-def setup_server_keys(workingdir):
-    privkey, pubkey = e.create_key_pair()
-    with open(f'{workingdir}/public_key.pem', 'wb') as f:
-        f.write(pubkey)
-    return privkey
-
-def encrypt_server_privkey(fkey,pkey,workingdir):
-    encrypted_data = fkey.encrypt(pkey)
-    # Write the encrypted data to a new file.
-    with open(f'{workingdir}/creds/pkey', "rb") as f:
-        f.write(encrypted_data)
-
 def save_db_credentials(fkey,workingdir):
     host = input('Enter MySQL/MariaDB Server IP Address: ')
     user = input('Enter Username: ')
@@ -62,8 +50,6 @@ def main():
     print(firstrun.welcome_message)
     workingdir = setup_server_dir()
     fkey = e.fernet_initkey(workingdir)
-    print(firstrun.keypair_setup)
-    encrypt_server_privkey(fkey,setup_server_keys(workingdir),workingdir)
     save_db_credentials(fkey,workingdir)
     del fkey
     print(firstrun.security)
