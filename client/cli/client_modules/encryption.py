@@ -47,9 +47,6 @@ def encrypt_packet(data, key):
     ciphertext = aesgcm.encrypt(nonce, data, None)
     return pickle.dumps({'nonce': nonce, 'ciphertext': ciphertext})
 
-def de_packet(packet):
-    return loads(packet.decode('utf-8').replace('"', "\\\"").replace("'", "\""))
-
 def decrypt_packet(data, key):
     aesgcm = AESGCM(key)
     nonce = data['nonce']

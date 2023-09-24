@@ -13,7 +13,7 @@ async def catch(websocket):
     await websocket.send(SERVER_CREDS['server_epbkey'])
     client_epbkey = await websocket.recv()
     client_epbkey = s.load_pem_public_key(client_epbkey)
-    SESSIONS[con_id][1] = en.derive_le_key(
+    SESSIONS[con_id][1] = en.derive_key(
         SERVER_CREDS['server_eprkey'], client_epbkey, 'connection'
     )
     del client_epbkey
@@ -39,7 +39,10 @@ async def identify_client(websocket):
     return list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(websocket)]
 
 async def main():
-    async with websockets.serve(catch, '', 6969):
+    async with websockets.serve(
+        catch, host='', port=6969, 
+        ping_interval=30, ping_timeout=None, close_timeout=None,
+        max_size=10485760 ):
         await asyncio.Future()  # run forever
 
 if __name__ == "__main__":

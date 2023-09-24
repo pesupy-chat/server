@@ -23,7 +23,7 @@ async def handle_resp(response):
 
 async def main():
     uri = "ws://ilamparithi.ddns.net:6969"
-    async with websockets.connect(uri) as websocket:
+    async with websockets.connect(uri, ping_interval=30) as websocket:
         user_id = str(uuid4())
         await websocket.send(user_id)
         key = await websocket.recv()

@@ -54,7 +54,7 @@ def fermat_gen(workingdir):
     key = Fernet(key)
     return key
 
-def derive_le_key(eprkey, epbkey, keyinfo):
+def derive_key(eprkey, epbkey, keyinfo):
     shared_key = eprkey.exchange(
         ec.ECDH(), epbkey)
     # Perform key derivation.
@@ -85,9 +85,6 @@ def encrypt_packet(data, key):
     nonce = urandom(12)  # Unique nonce for each message
     ciphertext = aesgcm.encrypt(nonce, data, None)
     return pickle.dumps({'nonce': nonce, 'ciphertext': ciphertext})
-
-def de_packet(packet):
-    return loads(packet.decode('utf-8').replace('"', "\\\"").replace("'", "\""))
 
 def decrypt_packet(data, key):
     aesgcm = AESGCM(key)
