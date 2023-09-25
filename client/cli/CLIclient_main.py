@@ -35,8 +35,9 @@ async def main():
         )
         await websocket.send(CLIENT_CREDS['client_epbkey'])
         while True:
-            message = eval(input("Enter packet: "))
-            await send_message(websocket, message)
+            # message = eval(input("Enter packet: "))
+            for i in range(0, 31):
+                await send_message(websocket, {'type':'echo', 'data':f'{i}'})
 
 SERVER_CREDS = {}
 CLIENT_CREDS = {}

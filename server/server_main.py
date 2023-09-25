@@ -32,7 +32,9 @@ async def interpret(packet, websocket):
     sender = await identify_client(websocket)
     dict = en.decrypt_packet(pickle.loads(packet), SESSIONS[sender][1])
     de_packet = pickle.loads(dict)
+    de_packet['data'] = de_packet['data'] + ' ' + str(packet_no[0])
     print(f"[INFO] Server sent {de_packet} to {sender}")
+    packet_no[0] += 1
     return [sender, de_packet] #handler(sender, type, data)
 
 async def identify_client(websocket):
@@ -53,4 +55,5 @@ if __name__ == "__main__":
     server_eprkey, server_epbkey = en.create_key_pair()
     SERVER_CREDS['server_eprkey'] = server_eprkey
     SERVER_CREDS['server_epbkey'] = en.ser_key_pem(server_epbkey, 'public')
+    packet_no = {0:0}
     asyncio.run(main())
