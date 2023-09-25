@@ -33,7 +33,7 @@ async def interpret(packet, websocket):
     dict = en.decrypt_packet(pickle.loads(packet), SESSIONS[sender][1])
     de_packet = pickle.loads(dict)
     de_packet['data'] = de_packet['data'] + ' ' + str(packet_no[0])
-    print(f"[INFO] Server sent {de_packet} to {sender}")
+    print(f"[INFO] Server sent {de_packet} to {websocket.remote_address} [{sender}]")
     packet_no[0] += 1
     return [sender, de_packet] #handler(sender, type, data)
 
