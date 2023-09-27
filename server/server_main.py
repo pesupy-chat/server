@@ -1,10 +1,13 @@
 import os, sys
 import asyncio
 import websockets
+from server_modules import firstrun
 from server_modules import encryption as en
 from server_modules import db_handler as db
 from cryptography.hazmat.primitives import serialization as s
 import pickle
+import i18n
+from yaml import safe_load as loadyaml
 
 async def catch(websocket):
     con_id = await websocket.recv()
@@ -48,10 +51,44 @@ async def main():
         max_size=10485760 ):
         await asyncio.Future()  # run forever
 
+def fill_missing_workingdir(f):
+    print("Could not determine server's working directory.\
+          Is this the first time you are running the server?")
+    while True:
+        choice = input("(Y / N) > ")
+        if choice.lower() == 'y':
+            print("Executing firstrun script...")
+            firstrun.main()
+            print("Server will now exit. Please run it again!")
+            sys.exit()
+        elif choice.lower() == 'n':
+            print("Please enter the path to the working directory")
+            print("This should be the directory you used in the first run setup:")
+            f.seek(0)
+            f.write("working_directory: "+firstrun.get_server_dir())
+            print("Server will now exit. Please run it again!")
+            sys.exit()
+
 if __name__ == "__main__":
     SESSIONS = {}
     SERVER_CREDS = {}
-    workingdir = '/mnt/data/pesupy'
+    try:
+        print(os.path.dirname(os.path.abspath(__file__)))
+        with open(f'{os.path.dirname(os.path.abspath(__file__))}/config.yml', 'r+') as f:
+            config = loadyaml(f.read())
+            if not config:
+                fill_missing_workingdir(f)
+            elif not config['working_directory']:
+                fill_missing_workingdir(f)
+            # not gonna handle any more edge cases
+            else:
+                pass
+    except FileNotFoundError as err:
+        print("Configuration file not found! Executing firstrun script..")
+        firstrun.main()
+        print("Server will now exit. Please run it again!")
+        sys.exit()
+    workingdir = config['working_directory']
     db.decrypt_creds(en.fermat_gen(workingdir), workingdir)
     server_eprkey, server_epbkey = en.create_key_pair()
     SERVER_CREDS['server_eprkey'] = server_eprkey

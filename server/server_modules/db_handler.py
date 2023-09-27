@@ -1,7 +1,7 @@
 from json import loads
 import mysql.connector as sqltor
 from uuid import uuid4
-
+import pickle
 class db:
     con = ()
     cur = ()
@@ -10,7 +10,7 @@ def decrypt_creds(fkey, workingdir):
     with open(f'{workingdir}/creds/db', 'rb') as f:
         data = f.read()
     decrypted = fkey.decrypt(data)
-    dict = loads(decrypted.decode('utf-8').replace('"', "\\\"").replace("'", "\""))
+    dict = pickle.loads(decrypted)
     setattr(db, 'con', sqltor.connect(host = dict['host'], user = dict['user'], passwd = dict['passwd']))
     setattr(db, 'cur', db.con.cursor())
 
