@@ -1,7 +1,5 @@
 # pesupy-chat
 
-## Problem Statement
-
 The project aims to create an end-to-end encrypted chat platform that enables users to securely exchange text messages. It consists of a Server program, which runs on a network-connected computer, and a command-line Client application for users to connect, create accounts, and engage in secure chatting with other account holders on the server.
 
 ### Server Program
@@ -16,9 +14,9 @@ The Client program is a command-line interface that provides end-users with a st
 
 Client messages are securely transmitted using end-to-end encryption, ensuring data confidentiality between the Client, Server, and recipients. Account credentials are also transported securely using the same encryption method to prevent unauthorized access to user accounts. Additionally, account credentials and chat backups are stored in an encrypted format within the Server's MySQL database, providing an extra layer of security.
 
-## Problem Analysis
+## Explanation &amp; Installation
 
-### Introduction to End-to-End Encryption
+### End-to-End Encryption
 
 End-to-end encryption (E2EE) is a robust data encryption method that ensures only the sender and intended recipient can access the data. This is achieved through a pair of mathematically linked keys: a public key used for encryption and a private key used for decryption. E2EE ensures privacy and security by never storing private keys on third-party servers, preventing even service providers from decrypting messages.
 
