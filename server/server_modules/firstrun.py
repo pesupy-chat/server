@@ -47,19 +47,19 @@ def setup_server_dir():
             os.mkdir(f'{spath}/creds')
             break
         elif os.path.exists(f'{spath}/creds'):
-            print("Previous Installation Detected! Please delete the files or choose another folder.")
+            print(firstrun.savedata.data_exists)
 
     return spath
 
 def save_db_credentials(fkey,workingdir):
-    host = input('Enter MySQL/MariaDB Server IP Address: ')
-    port = input('Enter MySQL/MariaDB Server Port (leave blank for 3306): ')
-    user = input('Enter Username: ')
+    host = input(firstrun.database.host)
+    port = input(firstrun.database.port)
+    user = input(firstrun.database.user)
     if not port:
         port = 3306
     else:
         port = int(port)
-    passwd = getpass.getpass('Enter Password: ')
+    passwd = getpass.getpass(firstrun.database.passwd)
     data = pickle.dumps({'host':host, 'port': port, 'user':user, 'passwd':passwd})
     with open(f'{workingdir}/creds/db', 'wb') as f:
         f.write(fkey.encrypt(data))
@@ -75,8 +75,10 @@ def main():
     db_handler.decrypt_creds(e.fermat_gen(workingdir), workingdir)
     print(firstrun.initialize_db)
     db_handler.initialize_schemas()
-    with open('config.yml', 'w') as fi:
-        config = {'working_directory': workingdir}
+    host = input("Enter Server Listen Address: ")
+    port = int(input("Enter Server Listen Port: "))
+    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../config.yml', 'w') as fi:
+        config = {'working_directory': workingdir, 'listen_address': host, 'listen_port': port}
         fi.write(dumpyaml(config))
 
 

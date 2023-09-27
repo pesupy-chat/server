@@ -2,6 +2,20 @@ from json import loads
 import mysql.connector as sqltor
 from uuid import uuid4
 import pickle
+
+initialize = """CREATE DATABASE IF NOT EXISTS `chatapp_accounts`;
+USE `chatapp_accounts`;
+CREATE TABLE IF NOT EXISTS `users`(`UUID` char(32) NOT NULL, `USERNAME` varchar(32) NOT NULL, `FULL_NAME` varchar(80) NOT NULL, `DOB` date NOT NULL, `EMAIL` varchar(32) DEFAULT NULL, `CREATION` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (`UUID`));
+CREATE TABLE IF NOT EXISTS `auth`(`UUID` char(32) NOT NULL, `SALTED_HASHBROWN` blob NOT NULL, `TOKEN` tinytext NOT NULL, `EXPIRY` timestamp NOT NULL, KEY `authUUID` (`UUID`), CONSTRAINT `authUUID` FOREIGN KEY (`UUID`) REFERENCES `users` (`UUID`));
+CREATE TABLE IF NOT EXISTS `pubkeys`(`UUID` char(32) NOT NULL, `PUBKEY` blob NOT NULL, KEY `UUID` (`UUID`), CONSTRAINT `UUID` FOREIGN KEY (`UUID`) REFERENCES `users` (`UUID`) ON DELETE CASCADE ON UPDATE CASCADE);
+CREATE DATABASE IF NOT EXISTS `chatapp_chats`;
+USE `chatapp_chats`;
+CREATE TABLE IF NOT EXISTS `rooms` (`ID` int NOT NULL AUTO_INCREMENT, `CREATOR_UUID` char(32) NOT NULL, `ROOM_TYPE` int NOT NULL, `MEMBERS` blob NOT NULL, `TABLE` tinytext NOT NULL, PRIMARY KEY (`ID`));
+CREATE DATABASE IF NOT EXISTS `chatapp_internal`;
+USE `chatapp_internal`;
+CREATE TABLE IF NOT EXISTS `settings` (`PARAM` varchar(64) NOT NULL, `VALUE` varchar(256) NOT NULL);"""
+
+queries = {'initialize': initialize}
 class db:
     con = ()
     cur = ()
@@ -15,11 +29,9 @@ def decrypt_creds(fkey, workingdir):
     setattr(db, 'cur', db.con.cursor())
 
 def initialize_schemas():
-    f = open('database.sql', 'r')
-    query = f.read()
+    query = queries['initialize']
     db.cur.execute(query, multi=True)
     db.con.commit()
-    f.close()
 
 class Config(db):
     @staticmethod

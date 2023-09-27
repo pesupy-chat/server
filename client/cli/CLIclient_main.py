@@ -18,7 +18,7 @@ async def handle_resp(response):
     de_packet = pickle.loads(inpacket)
     type = de_packet['type']
     data = de_packet['data']
-    print(data)
+    print(data) # handle here using type and data
     return None
 
 async def main():

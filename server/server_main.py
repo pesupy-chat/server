@@ -8,12 +8,13 @@ from cryptography.hazmat.primitives import serialization as s
 import pickle
 import i18n
 from yaml import safe_load as loadyaml
+from yaml import dump as dumpyaml
 
 async def catch(websocket):
     con_id = await websocket.recv()
     SESSIONS[con_id] = [websocket, None, None] # ws, derived key, user_uid
-    print(f"[INFO] {con_id} CONN_ESTABLISHED: {websocket}")
-    print(f"SENDING PUBLIC KEY to {con_id}")
+    print(f"[INFO] {con_id} CONN_ESTABLISHED: {websocket.remote_address}")
+    print(f"[INFO] SENDING PUBLIC KEY to {con_id}")
     await websocket.send(SERVER_CREDS['server_epbkey'])
     client_epbkey = await websocket.recv()
     client_epbkey = s.load_pem_public_key(client_epbkey)
@@ -30,7 +31,7 @@ async def catch(websocket):
             await websocket.send(outpacket)
     except Exception as e:
         del SESSIONS[con_id]
-        print(f"Client {con_id} disconnected due to\n\t\t",e)
+        print(f"[INFO] CLIENT {con_id} DISCONNECTED due to\n\t",e)
 
 async def interpret(packet, websocket):
     sender = await identify_client(websocket)
@@ -39,59 +40,84 @@ async def interpret(packet, websocket):
     de_packet['data'] = de_packet['data'] + ' ' + str(packet_no[0])
     print(f"[INFO] Server sent {de_packet} to {websocket.remote_address} [{sender}]")
     packet_no[0] += 1
-    return [sender, de_packet] #handler(sender, type, data)
+    return [sender, de_packet] # return handler(sender, type, data)
 
 async def identify_client(websocket):
     return list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(websocket)]
 
-async def main():
+async def main(host, port):
     async with websockets.serve(
-        catch, host='', port=6969, 
+        catch, host=host, port=port, 
         ping_interval=30, ping_timeout=None, close_timeout=None,
-        max_size=10485760 ):
+        max_size=10485760 
+    ):
         await asyncio.Future()  # run forever
 
-def fill_missing_workingdir(f):
-    print("Could not determine server's working directory.\
-          Is this the first time you are running the server?")
-    while True:
-        choice = input("(Y / N) > ")
-        if choice.lower() == 'y':
-            print("Executing firstrun script...")
-            firstrun.main()
-            print("Server will now exit. Please run it again!")
-            sys.exit()
-        elif choice.lower() == 'n':
-            print("Please enter the path to the working directory")
-            print("This should be the directory you used in the first run setup:")
-            f.seek(0)
-            f.write("working_directory: "+firstrun.get_server_dir())
-            print("Server will now exit. Please run it again!")
-            sys.exit()
+def check_missing_config(f, yaml, config):
+    try:
+        if yaml[config] is None:
+            print(i18n.firstrun.prompt1+config)
+            fill_missing_config(f, yaml, config)
+    except KeyError:
+        print(i18n.firstrun.prompt1+config)
+        fill_missing_config(f, yaml, config)
+
+def fill_missing_config(f, yaml, config):
+    print(i18n.firstrun.fix_missing, config)
+    yaml[config] = input('\n> ')
+    if config in ['listen_port', 'another_int']:
+        yaml[config] = int(yaml[config])
+    f.seek(0)
+    f.write(dumpyaml(yaml))
 
 if __name__ == "__main__":
     SESSIONS = {}
     SERVER_CREDS = {}
+    packet_no = {0:0}
     try:
-        print(os.path.dirname(os.path.abspath(__file__)))
-        with open(f'{os.path.dirname(os.path.abspath(__file__))}/config.yml', 'r+') as f:
-            config = loadyaml(f.read())
-            if not config:
-                fill_missing_workingdir(f)
-            elif not config['working_directory']:
-                fill_missing_workingdir(f)
-            # not gonna handle any more edge cases
-            else:
-                pass
+        rootdir = os.path.dirname(os.path.abspath(__file__))
+        print("[INFO] SERVER STARTING FROM",rootdir)
+        f = open(f'{rootdir}/config.yml', 'r+')
+        yaml = loadyaml(f.read())
+        if not yaml:
+            f.close()
+            os.remove(f'{rootdir}/config.yml')
+            print(i18n.firstrun.empty_config, i18n.firstrun.exit, end='\n')
+            sys.exit()
+        elif not yaml['working_directory']:
+            print(i18n.firstrun.prompt1+'working_directory', i18n.firstrun.prompt2, sep='\n', end='\n')
+            while True:
+                choice = input("(Y / N) > ")
+                if choice.lower() == 'y':
+                    print(i18n.firstrun.exec)
+                    f.close()
+                    os.remove(f'{rootdir}/config.yml')
+                    firstrun.main()
+                    print(i18n.firstrun.exit)
+                    sys.exit()
+                elif choice.lower() == 'n':
+                    fill_missing_config(f, yaml, 'working_directory')
+                    break
+        check_missing_config(f, yaml, 'listen_address')
+        check_missing_config(f, yaml, 'listen_port')
+        f.close()
+
     except FileNotFoundError as err:
-        print("Configuration file not found! Executing firstrun script..")
+        print(i18n.firstrun.config_not_found, i18n.firstrun.exec)
         firstrun.main()
-        print("Server will now exit. Please run it again!")
+        print(i18n.firstrun.exit)
         sys.exit()
-    workingdir = config['working_directory']
-    db.decrypt_creds(en.fermat_gen(workingdir), workingdir)
+
+    workingdir = yaml['working_directory']
+    host, port = yaml['listen_address'], yaml['listen_port']
+    try:
+        db.decrypt_creds(en.fermat_gen(workingdir), workingdir)
+    except Exception as w:
+        print("Error while decrypting database credentials. Check your password")
+        print(i18n.firstrun.exit)
+        sys.exit()
     server_eprkey, server_epbkey = en.create_key_pair()
     SERVER_CREDS['server_eprkey'] = server_eprkey
     SERVER_CREDS['server_epbkey'] = en.ser_key_pem(server_epbkey, 'public')
-    packet_no = {0:0}
-    asyncio.run(main())
+    print("[INFO] SERVER ONLINE!")
+    asyncio.run(main(host,port))
