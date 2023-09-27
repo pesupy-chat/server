@@ -4,7 +4,6 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-import server.server_modules.i18n_for_modules as i18n_for_modules
 from getpass import getpass
 from os import urandom
 from base64 import urlsafe_b64encode
