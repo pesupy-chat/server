@@ -4,13 +4,14 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from server_modules import i18n
+import server.server_modules.i18n_for_modules as i18n_for_modules
 from getpass import getpass
 from os import urandom
 from base64 import urlsafe_b64encode
 from json import loads
 import pickle
 from binascii import hexlify
+import i18n_for_modules as i18nm
 
 def create_key_pair():
     private_key_d = ec.generate_private_key(ec.SECP256K1())
@@ -20,12 +21,12 @@ def create_key_pair():
 def fernet_initkey(workingdir):
     passwd = ''
     while True:
-        passwd = getpass(i18n.firstrun.passwd.input)
-        confirm = getpass(i18n.firstrun.passwd.confirm)
+        passwd = getpass(i18nm.firstrun.passwd.input)
+        confirm = getpass(i18nm.firstrun.passwd.confirm)
         if passwd == confirm:
             break
         else:
-            print(i18n.firstrun.passwd.retry)
+            print(i18nm.firstrun.passwd.retry)
     # Generate a Fernet key with the password and save the salt
     salt = urandom(16)
     with open(f"{workingdir}/creds/salt", "wb") as f:

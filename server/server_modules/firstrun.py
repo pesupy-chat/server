@@ -1,6 +1,6 @@
 import os
 import getpass
-from i18n import firstrun
+from i18n_for_modules import firstrun
 import encryption as e
 import db_handler
 try: 
@@ -34,7 +34,7 @@ def setup_server_dir():
                 else:
                     print(firstrun.savedata.created)
                     break
-        os.mkdir(f'{spath}/creds')
+    os.mkdir(f'{spath}/creds')
 
     return spath
 

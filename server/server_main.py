@@ -1,3 +1,4 @@
+import os, sys
 import asyncio
 import websockets
 from server_modules import encryption as en
