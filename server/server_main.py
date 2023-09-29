@@ -4,36 +4,29 @@ import websockets
 from server_modules import firstrun
 from server_modules import encryption as en
 from server_modules import db_handler as db
+# from server_modules import packet_handler as p
 from cryptography.hazmat.primitives import serialization as s
 import pickle
 import i18n
 from yaml import safe_load as loadyaml
 from yaml import dump as dumpyaml
+from uuid import UUID
 
-async def catch(websocket):
-    con_id = await websocket.recv()
-    SESSIONS[con_id] = [websocket, None, None] # ws, derived key, user_uid
-    print(f"[INFO] {con_id} CONN_ESTABLISHED: {websocket.remote_address}")
-    print(f"[INFO] SENDING PUBLIC KEY to {con_id}")
-    await websocket.send(SERVER_CREDS['server_epbkey'])
-    client_epbkey = await websocket.recv()
-    client_epbkey = s.load_pem_public_key(client_epbkey)
-    SESSIONS[con_id][1] = en.derive_key(
-        SERVER_CREDS['server_eprkey'], client_epbkey, 'connection'
-    )
-    del client_epbkey
+
+def is_valid_uuid(uuid):
     try:
-        while True:
-            outpacket = await interpret(await websocket.recv(), websocket)
-            outpacket = en.encrypt_packet(
-                outpacket[1], SESSIONS[outpacket[0]][1]
-            )
-            await websocket.send(outpacket)
-    except Exception as e:
-        del SESSIONS[con_id]
-        print(f"[INFO] CLIENT {con_id} DISCONNECTED due to\n\t",e)
+        UUID(uuid, version=4)
+    except ValueError:
+        return False
+    else:
+        return True and uuid not in SESSIONS.keys()
+
+async def identify_client(websocket):
+    global SESSIONS
+    return list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(websocket)]
 
 async def interpret(packet, websocket):
+    global packet_no, SESSIONS
     sender = await identify_client(websocket)
     dict = en.decrypt_packet(pickle.loads(packet), SESSIONS[sender][1])
     de_packet = pickle.loads(dict)
@@ -42,8 +35,50 @@ async def interpret(packet, websocket):
     packet_no[0] += 1
     return [sender, de_packet] # return handler(sender, type, data)
 
-async def identify_client(websocket):
-    return list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(websocket)]
+async def catch(websocket):
+    # Establish Connection
+    con_id = await websocket.recv()
+    if is_valid_uuid(con_id):
+        SESSIONS[con_id] = [websocket, None, None] # ws, derived key, user_uid
+    else:
+        print(f"[INFO] CLIENT unestablished DISCONNECTED due to INVALID_UUID")
+        await websocket.close()
+        return None
+
+    print(f"[INFO] {con_id} CONN_ESTABLISHED: {websocket.remote_address}")
+    print(f"[INFO] SENDING PUBLIC KEY to {con_id}")
+
+    # Encrypt Connection
+    await websocket.send(SERVER_CREDS['server_epbkey'])
+    try:
+        client_epbkey = await websocket.recv()
+        client_epbkey = s.load_pem_public_key(client_epbkey)
+        SESSIONS[con_id][1] = en.derive_key(
+            SERVER_CREDS['server_eprkey'], client_epbkey, 'connection'
+        )
+        print(f"[INFO] Derived key for {websocket.remote_address}")
+        del client_epbkey
+    # If client sends bullshit instead of its PEM serialized ephemeral public key
+    except Exception as err:
+    #   await websocket.send({'type':'ERR', 'data':{'code':'INVALID_CONN_KEY'}})
+        print(f"[INFO] CLIENT {con_id} DISCONNECTED due to INVALID_CONN_KEY:\n\t",err)
+        await websocket.close()
+        del SESSIONS[con_id]
+        return None
+    
+    # Handle further incoming packets
+    try:
+        while True:
+            outpacket = await interpret(await websocket.recv(), websocket)
+            outpacket = en.encrypt_packet(
+                outpacket[1], SESSIONS[outpacket[0]][1]
+            )
+            await websocket.send(outpacket)
+    # Handle disconnection due to any exception
+    except Exception as e:
+        print(f"[INFO] CLIENT {con_id} DISCONNECTED due to\n\t",e)
+        del SESSIONS[con_id]
+        return None
 
 async def main(host, port):
     async with websockets.serve(
@@ -76,7 +111,7 @@ if __name__ == "__main__":
     packet_no = {0:0}
     try:
         rootdir = os.path.dirname(os.path.abspath(__file__))
-        print("[INFO] SERVER STARTING FROM",rootdir)
+        print(i18n.log.tags.info+i18n.log.server_start.format(rootdir))
         f = open(f'{rootdir}/config.yml', 'r+')
         yaml = loadyaml(f.read())
         if not yaml:

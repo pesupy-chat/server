@@ -35,3 +35,10 @@ class firstrun():
         input = "Enter the server's launch password: "
         confirm = "Enter it again to confirm: "
         retry = "Passwords do not match!"
+
+class log():
+    class tags():
+        info = '[INFO] '
+        warn = '[WARN] '
+        error = '[ERR] '
+    server_start = "Server starting from path {0}...."

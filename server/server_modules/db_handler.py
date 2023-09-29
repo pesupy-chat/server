@@ -1,6 +1,6 @@
 from json import loads
 import mysql.connector as sqltor
-from uuid import uuid4
+from uuid import uuid4, UUID
 import pickle
 
 initialize = """CREATE DATABASE IF NOT EXISTS `chatapp_accounts`;
