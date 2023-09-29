@@ -36,13 +36,17 @@ async def interpret(packet, websocket):
     return [sender, de_packet] # return handler(sender, type, data)
 
 async def catch(websocket):
+    print(f"[INFO] Remote {websocket.remote_address} attempted connection")
     # Establish Connection
-    con_id = await websocket.recv()
+    try:
+        con_id = await websocket.recv()
+    except websocket.exceptions.ConnectionClosedOK as err1:
+        print(f"[INFO] Remote {websocket.remote_address} gracefuly disconnected:",err1)
     if is_valid_uuid(con_id):
         SESSIONS[con_id] = [websocket, None, None] # ws, derived key, user_uid
     else:
-        print(f"[INFO] CLIENT unestablished DISCONNECTED due to INVALID_UUID")
-        await websocket.close()
+        print(f"[INFO] CLIENT unestablished {websocket.remote_address} DISCONNECTED due to INVALID_UUID")
+        await websocket.close(code = 1008, reason = "Connection UUID Invalid/Already in use")
         return None
 
     print(f"[INFO] {con_id} CONN_ESTABLISHED: {websocket.remote_address}")
@@ -59,10 +63,10 @@ async def catch(websocket):
         print(f"[INFO] Derived key for {websocket.remote_address}")
         del client_epbkey
     # If client sends bullshit instead of its PEM serialized ephemeral public key
-    except Exception as err:
+    except Exception as err2:
     #   await websocket.send({'type':'ERR', 'data':{'code':'INVALID_CONN_KEY'}})
-        print(f"[INFO] CLIENT {con_id} DISCONNECTED due to INVALID_CONN_KEY:\n\t",err)
-        await websocket.close()
+        print(f"[INFO] CLIENT {con_id} {websocket.remote_address} DISCONNECTED due to INVALID_CONN_KEY:\n\t",err2)
+        await websocket.close(code = 1003, reason = "Connection Ephemeral Public Key in invalid format")
         del SESSIONS[con_id]
         return None
     
@@ -75,8 +79,8 @@ async def catch(websocket):
             )
             await websocket.send(outpacket)
     # Handle disconnection due to any exception
-    except Exception as e:
-        print(f"[INFO] CLIENT {con_id} DISCONNECTED due to\n\t",e)
+    except Exception as err3:
+        print(f"[INFO] CLIENT {con_id} DISCONNECTED due to\n\t",err3)
         del SESSIONS[con_id]
         return None
 

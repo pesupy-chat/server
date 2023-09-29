@@ -4,6 +4,7 @@ from cryptography.hazmat.primitives import serialization as s
 from client_modules import encryption as e
 from uuid import uuid4
 import pickle
+from sys import exit
 
 async def send_message(websocket, message):
     outpacket = e.encrypt_packet(
@@ -34,13 +35,17 @@ async def main():
             if ch == 0:
                 con_id = input("Enter VALID UUID")# str(uuid4())
                 await websocket.send(con_id)
-                key = await websocket.recv()
-                pubkey = s.load_pem_public_key(key)
-                SERVER_CREDS['server_epbkey'] = pubkey
-                print("RECEIVED SERVER PUBLIC KEY")
-                SERVER_CREDS['derived_key'] = e.derive_key(
-                    CLIENT_CREDS['client_eprkey'], pubkey, 'connection'
-                )
+                try:
+                    key = await websocket.recv()
+                    pubkey = s.load_pem_public_key(key)
+                    SERVER_CREDS['server_epbkey'] = pubkey
+                    print("RECEIVED SERVER PUBLIC KEY")
+                    SERVER_CREDS['derived_key'] = e.derive_key(
+                        CLIENT_CREDS['client_eprkey'], pubkey, 'connection'
+                    )
+                except websockets.exceptions.ConnectionClosedError as err:
+                    print("Disconected from Server! Error:\n",err)
+                    exit()
             elif ch == 1:
                 await websocket.send(CLIENT_CREDS['client_epbkey'])
             else:
