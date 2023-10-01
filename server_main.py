@@ -13,6 +13,23 @@ from yaml import dump as dumpyaml
 from uuid import UUID
 
 
+def check_missing_config(f, yaml, config):
+    try:
+        if yaml[config] is None:
+            print(i18n.firstrun.prompt1+config)
+            fill_missing_config(f, yaml, config)
+    except KeyError:
+        print(i18n.firstrun.prompt1+config)
+        fill_missing_config(f, yaml, config)
+
+def fill_missing_config(f, yaml, config):
+    print(i18n.firstrun.fix_missing, config)
+    yaml[config] = input('\n> ')
+    if config in ['listen_port', 'another_int']:
+        yaml[config] = int(yaml[config])
+    f.seek(0)
+    f.write(dumpyaml(yaml))
+
 def is_valid_uuid(uuid):
     try:
         UUID(uuid, version=4)
@@ -24,16 +41,6 @@ def is_valid_uuid(uuid):
 async def identify_client(websocket):
     global SESSIONS
     return list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(websocket)]
-
-async def interpret(packet, websocket):
-    global packet_no, SESSIONS
-    sender = await identify_client(websocket)
-    dict = en.decrypt_packet(pickle.loads(packet), SESSIONS[sender][1])
-    de_packet = pickle.loads(dict)
-    de_packet['data'] = de_packet['data'] + ' ' + str(packet_no[0])
-    print(f"[INFO] Server sent {de_packet} to {websocket.remote_address} [{sender}]")
-    packet_no[0] += 1
-    return [sender, de_packet] # return handler(sender, type, data)
 
 async def catch(websocket):
     print(f"[INFO] Remote {websocket.remote_address} attempted connection")
@@ -92,22 +99,15 @@ async def main(host, port):
     ):
         await asyncio.Future()  # run forever
 
-def check_missing_config(f, yaml, config):
-    try:
-        if yaml[config] is None:
-            print(i18n.firstrun.prompt1+config)
-            fill_missing_config(f, yaml, config)
-    except KeyError:
-        print(i18n.firstrun.prompt1+config)
-        fill_missing_config(f, yaml, config)
-
-def fill_missing_config(f, yaml, config):
-    print(i18n.firstrun.fix_missing, config)
-    yaml[config] = input('\n> ')
-    if config in ['listen_port', 'another_int']:
-        yaml[config] = int(yaml[config])
-    f.seek(0)
-    f.write(dumpyaml(yaml))
+async def interpret(packet, websocket):
+    global packet_no, SESSIONS
+    sender = await identify_client(websocket)
+    dict = en.decrypt_packet(pickle.loads(packet), SESSIONS[sender][1])
+    de_packet = pickle.loads(dict)
+    de_packet['data'] = de_packet['data'] + ' ' + str(packet_no[0])
+    print(f"[INFO] Server sent {de_packet} to {websocket.remote_address} [{sender}]")
+    packet_no[0] += 1
+    return [sender, de_packet] # return handler(sender, type, data)
 
 if __name__ == "__main__":
     SESSIONS = {}

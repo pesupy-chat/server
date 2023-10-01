@@ -1,4 +1,6 @@
+asyncio
 websockets
+pickle
 uuid
 pyyaml
 cryptography
