@@ -11,11 +11,14 @@ c client-chatpubkey
 s session-token
 c chat-create
 c chat-init
-c chat-packet
-    | - chat-text
-    | - chat-smallfile (image, audio, short videos) (upto 32MB)
-    | - chat-largefile (not implemented now)
-    | - chat-edit
-    | - chat-delete
+c msg-packet
+    | - msg-text
+    | - msg-smallfile (image, audio, short videos) (upto 32MB) (not implementing now)
+    | - msg-largefile (not implementing now)
+    | - msg-edit
+    | - msg-delete
+s chat-added
+s msg-update (subtype new, edit, delete)
+c read-receipt (implement if make GUI)
 c logout
 
