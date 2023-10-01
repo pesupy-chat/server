@@ -1,0 +1,21 @@
+c con-init
+s server-epubkey
+c client-epubkey
+s con-established
+c signup
+s captcha
+c captcha-response
+s creation-OK
+c login
+c client-chatpubkey
+s session-token
+c chat-create
+c chat-init
+c chat-packet
+    | - chat-text
+    | - chat-smallfile (image, audio, short videos) (upto 32MB)
+    | - chat-largefile (not implemented now)
+    | - chat-edit
+    | - chat-delete
+c logout
+
