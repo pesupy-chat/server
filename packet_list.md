@@ -17,7 +17,7 @@
 |c|session-token-auth|{'type':'AUTHENTICATE', 'data':{'token':token}}|
 |c|room-create|{'type':'CREATE_ROOM', 'data':{'people':[user1,user2,...]}}|
 |c|msg-packet|{'type':'CHAT_SEND', 'data':{'format':format, 'msg':message}}|
-|c|room-alter|{'type':'ALTER_ROOM', 'data':{'action':action, 'actiondata':actiondata|
+|c|room-alter|{'type':'ALTER_ROOM', 'data':{'action':action, 'actiondata':actiondata}}|
 |c|read-receipt (implement if make GUI)||
 |c|logout||
 
