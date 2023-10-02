@@ -21,10 +21,10 @@
 |c|read-receipt (implement if make GUI)||
 |c|logout||
 
-## msg-packet `format`s:
+## msg-packet `format`s
 
 - msg-text
 - msg-smallfile (image, audio, short videos) (upto 32MB) (not implementing now)
 - msg-largefile (not implementing now)
-- msg-edit 
+- msg-edit
 - msg-delete
