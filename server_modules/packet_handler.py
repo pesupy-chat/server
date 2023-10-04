@@ -30,16 +30,16 @@ async def establish_conn(SESSIONS, SERVER_CREDS, websocket, data):
         return None
     SESSIONS[uuid] = [websocket, None, None] # ws, derived key, user_uid
 
-    print(f"[INFO] {uuid} CONN_ESTABLISHED: {websocket.remote_address}")
+    print(f"[INFO] {uuid} CONN_INIT: {websocket.remote_address}")
     print(f"[INFO] SENDING PUBLIC KEY to {uuid}")
 
     # Encrypt Connection
-    await websocket.send(SERVER_CREDS['server_epbkey'])
+    await websocket.send(pickle.dumps({'type':'CONN_ENCRYPT_S','data':SERVER_CREDS['server_epbkey']}))
     try:
-        client_epbkey = await websocket.recv()
+        client_epbkey = pickle.loads(await websocket.recv())
         try:
             client_epbkey = s.load_pem_public_key(client_epbkey['data'])
-        except:
+        except Exception as e:
             print(f"[INFO] CLIENT un-established {websocket.remote_address} DISCONNECTED due to INVALID_PACKET")
             await websocket.close(code = 1008, reason = "Invalid packet structure")
             return None

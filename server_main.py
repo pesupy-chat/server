@@ -22,7 +22,10 @@ async def identify_client(websocket):
 
 async def interpret(packet, websocket):
     global SESSIONS
-    sender = await identify_client(websocket)
+    try:
+        sender = await identify_client(websocket)
+    except:
+        pass
     ds_packet = pickle.loads(packet)
     if 'nonce' in ds_packet.keys():
         try:
@@ -38,7 +41,6 @@ async def interpret(packet, websocket):
     return await p.handle(SESSIONS, SERVER_CREDS, de_packet, websocket) # return handler(sender, type, data)
 
 async def catch(websocket):
-    client = await identify_client(websocket)
     # Handle further incoming packets
     try:
         while True:
@@ -49,6 +51,7 @@ async def catch(websocket):
                 await websocket.send(result)
     # Handle disconnection due to any exception
     except Exception as err3:
+        client = await identify_client(websocket)
         print(f"[INFO] CLIENT {client} DISCONNECTED due to\n\t",err3)
         del SESSIONS[client]
         return None
