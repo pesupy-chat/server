@@ -36,40 +36,7 @@ async def interpret(packet, websocket):
     return [sender, de_packet] # return handler(sender, type, data)
 
 async def catch(websocket):
-    print(f"[INFO] Remote {websocket.remote_address} attempted connection")
-    # Establish Connection
-    try:
-        con_id = await websocket.recv()
-    except websocket.exceptions.ConnectionClosedOK as err1:
-        print(f"[INFO] Remote {websocket.remote_address} gracefuly disconnected:",err1)
-    if is_valid_uuid(con_id):
-        SESSIONS[con_id] = [websocket, None, None] # ws, derived key, user_uid
-    else:
-        print(f"[INFO] CLIENT unestablished {websocket.remote_address} DISCONNECTED due to INVALID_UUID")
-        await websocket.close(code = 1008, reason = "Connection UUID Invalid/Already in use")
-        return None
-
-    print(f"[INFO] {con_id} CONN_ESTABLISHED: {websocket.remote_address}")
-    print(f"[INFO] SENDING PUBLIC KEY to {con_id}")
-
-    # Encrypt Connection
-    await websocket.send(SERVER_CREDS['server_epbkey'])
-    try:
-        client_epbkey = await websocket.recv()
-        client_epbkey = s.load_pem_public_key(client_epbkey)
-        SESSIONS[con_id][1] = en.derive_key(
-            SERVER_CREDS['server_eprkey'], client_epbkey, 'connection'
-        )
-        print(f"[INFO] Derived key for {websocket.remote_address}")
-        del client_epbkey
-    # If client sends bullshit instead of its PEM serialized ephemeral public key
-    except Exception as err2:
-    #   await websocket.send({'type':'ERR', 'data':{'code':'INVALID_CONN_KEY'}})
-        print(f"[INFO] CLIENT {con_id} {websocket.remote_address} DISCONNECTED due to INVALID_CONN_KEY:\n\t",err2)
-        await websocket.close(code = 1003, reason = "Connection Ephemeral Public Key in invalid format")
-        del SESSIONS[con_id]
-        return None
-    
+    client = identify_client(websocket)
     # Handle further incoming packets
     try:
         while True:
@@ -80,17 +47,9 @@ async def catch(websocket):
             await websocket.send(outpacket)
     # Handle disconnection due to any exception
     except Exception as err3:
-        print(f"[INFO] CLIENT {con_id} DISCONNECTED due to\n\t",err3)
-        del SESSIONS[con_id]
+        print(f"[INFO] CLIENT {client} DISCONNECTED due to\n\t",err3)
+        del SESSIONS[client]
         return None
-
-async def main(host, port):
-    async with websockets.serve(
-        catch, host=host, port=port, 
-        ping_interval=30, ping_timeout=None, close_timeout=None,
-        max_size=10485760 
-    ):
-        await asyncio.Future()  # run forever
 
 def check_missing_config(f, yaml, config):
     try:
@@ -108,6 +67,14 @@ def fill_missing_config(f, yaml, config):
         yaml[config] = int(yaml[config])
     f.seek(0)
     f.write(dumpyaml(yaml))
+
+async def main(host, port):
+    async with websockets.serve(
+        catch, host=host, port=port, 
+        ping_interval=30, ping_timeout=None, close_timeout=None,
+        max_size=10485760 
+    ):
+        await asyncio.Future()  # run forever
 
 if __name__ == "__main__":
     SESSIONS = {}
