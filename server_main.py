@@ -4,47 +4,49 @@ import websockets
 from server_modules import firstrun
 from server_modules import encryption as en
 from server_modules import db_handler as db
-# from server_modules import packet_handler as p
-from cryptography.hazmat.primitives import serialization as s
+from server_modules import packet_handler as p
 import pickle
 import i18n
 from yaml import safe_load as loadyaml
 from yaml import dump as dumpyaml
-from uuid import UUID
 
 
-def is_valid_uuid(uuid):
-    try:
-        UUID(uuid, version=4)
-    except ValueError:
-        return False
-    else:
-        return True and uuid not in SESSIONS.keys()
+async def disconnect(ws, code, reason):
+    print(f"[INFO] CLIENT {identify_client(ws)} DISCONNECTED due to",code,reason)
+    await ws.close(code=code, reason=reason)
+    return None
 
 async def identify_client(websocket):
     global SESSIONS
     return list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(websocket)]
 
 async def interpret(packet, websocket):
-    global packet_no, SESSIONS
+    global SESSIONS
     sender = await identify_client(websocket)
-    dict = en.decrypt_packet(pickle.loads(packet), SESSIONS[sender][1])
-    de_packet = pickle.loads(dict)
-    de_packet['data'] = de_packet['data'] + ' ' + str(packet_no[0])
-    print(f"[INFO] Server sent {de_packet} to {websocket.remote_address} [{sender}]")
-    packet_no[0] += 1
-    return [sender, de_packet] # return handler(sender, type, data)
+    ds_packet = pickle.loads(packet)
+    if 'nonce' in ds_packet.keys():
+        try:
+            de_packet = en.decrypt_packet(ds_packet, SESSIONS[sender][1])
+        except:
+            await disconnect(websocket, 1008, "Invalid Packet Structure")
+            return 'CONN_CLOSED'
+    elif 'type' in ds_packet.keys():
+        de_packet = ds_packet
+    else:
+        await disconnect(websocket, 1008, "Invalid Packet Structure")
+        return 'CONN_CLOSED'
+    return await p.handle(SESSIONS, SERVER_CREDS, de_packet, websocket) # return handler(sender, type, data)
 
 async def catch(websocket):
-    client = identify_client(websocket)
+    client = await identify_client(websocket)
     # Handle further incoming packets
     try:
         while True:
-            outpacket = await interpret(await websocket.recv(), websocket)
-            outpacket = en.encrypt_packet(
-                outpacket[1], SESSIONS[outpacket[0]][1]
-            )
-            await websocket.send(outpacket)
+            result = await interpret(await websocket.recv(), websocket)
+            if result == 'CONN_CLOSED':
+                pass
+            else:
+                await websocket.send(result)
     # Handle disconnection due to any exception
     except Exception as err3:
         print(f"[INFO] CLIENT {client} DISCONNECTED due to\n\t",err3)
@@ -79,7 +81,6 @@ async def main(host, port):
 if __name__ == "__main__":
     SESSIONS = {}
     SERVER_CREDS = {}
-    packet_no = {0:0}
     try:
         rootdir = os.path.dirname(os.path.abspath(__file__))
         print(i18n.log.tags.info+i18n.log.server_start.format(rootdir))
