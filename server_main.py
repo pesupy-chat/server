@@ -20,6 +20,38 @@ async def identify_client(websocket):
     global SESSIONS
     return list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(websocket)]
 
+def check_missing_config(f, yaml, config):
+    if config == 'working_directory':
+        print(i18n.firstrun.prompt1+config, i18n.firstrun.prompt2, sep='\n', end='\n')
+        while True:
+            choice = input("(Y / N) > ")
+            if choice.lower() == 'y':
+                print(i18n.firstrun.exec)
+                f.close()
+                os.remove(f'{rootdir}/config.yml')
+                firstrun.main()
+                print(i18n.firstrun.exit)
+                sys.exit()
+            elif choice.lower() == 'n':
+                fill_missing_config(f, yaml, 'working_directory')
+                break
+    else:
+        try:
+            if yaml[config] is None:
+                print(i18n.firstrun.prompt1+config)
+                fill_missing_config(f, yaml, config)
+        except KeyError:
+            print(i18n.firstrun.prompt1+config)
+            fill_missing_config(f, yaml, config)
+
+def fill_missing_config(f, yaml, config):
+    print(i18n.firstrun.fix_missing, config)
+    yaml[config] = input('\n> ')
+    if config in ['listen_port', 'another_int']:
+        yaml[config] = int(yaml[config])
+    f.seek(0)
+    f.write(dumpyaml(yaml))
+
 async def interpret(packet, websocket):
     global SESSIONS
     try:
@@ -56,23 +88,6 @@ async def catch(websocket):
         del SESSIONS[client]
         return None
 
-def check_missing_config(f, yaml, config):
-    try:
-        if yaml[config] is None:
-            print(i18n.firstrun.prompt1+config)
-            fill_missing_config(f, yaml, config)
-    except KeyError:
-        print(i18n.firstrun.prompt1+config)
-        fill_missing_config(f, yaml, config)
-
-def fill_missing_config(f, yaml, config):
-    print(i18n.firstrun.fix_missing, config)
-    yaml[config] = input('\n> ')
-    if config in ['listen_port', 'another_int']:
-        yaml[config] = int(yaml[config])
-    f.seek(0)
-    f.write(dumpyaml(yaml))
-
 async def main(host, port):
     async with websockets.serve(
         catch, host=host, port=port, 
@@ -84,6 +99,7 @@ async def main(host, port):
 if __name__ == "__main__":
     SESSIONS = {}
     SERVER_CREDS = {}
+
     try:
         rootdir = os.path.dirname(os.path.abspath(__file__))
         print(i18n.log.tags.info+i18n.log.server_start.format(rootdir))
@@ -94,20 +110,7 @@ if __name__ == "__main__":
             os.remove(f'{rootdir}/config.yml')
             print(i18n.firstrun.empty_config, i18n.firstrun.exit, end='\n')
             sys.exit()
-        elif not yaml['working_directory']:
-            print(i18n.firstrun.prompt1+'working_directory', i18n.firstrun.prompt2, sep='\n', end='\n')
-            while True:
-                choice = input("(Y / N) > ")
-                if choice.lower() == 'y':
-                    print(i18n.firstrun.exec)
-                    f.close()
-                    os.remove(f'{rootdir}/config.yml')
-                    firstrun.main()
-                    print(i18n.firstrun.exit)
-                    sys.exit()
-                elif choice.lower() == 'n':
-                    fill_missing_config(f, yaml, 'working_directory')
-                    break
+        check_missing_config(f, yaml, 'working_directory')
         check_missing_config(f, yaml, 'listen_address')
         check_missing_config(f, yaml, 'listen_port')
         f.close()
@@ -120,14 +123,17 @@ if __name__ == "__main__":
 
     workingdir = yaml['working_directory']
     host, port = yaml['listen_address'], yaml['listen_port']
+
     try:
         db.decrypt_creds(en.fermat_gen(workingdir), workingdir)
     except Exception as w:
         print("Error while decrypting database credentials. Check your password")
         print(i18n.firstrun.exit)
         sys.exit()
+
     server_eprkey, server_epbkey = en.create_key_pair()
     SERVER_CREDS['server_eprkey'] = server_eprkey
     SERVER_CREDS['server_epbkey'] = en.ser_key_pem(server_epbkey, 'public')
+
     print("[INFO] SERVER ONLINE!")
     asyncio.run(main(host,port))
