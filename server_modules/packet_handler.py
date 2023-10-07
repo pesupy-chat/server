@@ -5,7 +5,10 @@ from . import encryption as en
 from uuid import UUID
 from cryptography.hazmat.primitives import serialization as s
 
-
+upacket_map = {
+    'CONN_INIT':1,
+    'CONN_ENCRYPT_C':2
+}
 packet_map = { 
     'SIGNUP':1,
     'S_CAPTCHA':2,
