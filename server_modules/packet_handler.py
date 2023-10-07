@@ -5,21 +5,13 @@ from . import encryption as en
 from uuid import UUID
 from cryptography.hazmat.primitives import serialization as s
 
-upacket_map = {
-    'CONN_INIT':1,
-    'CONN_ENCRYPT_C':2
-}
-packet_map = { 
-    'SIGNUP':1,
-    'S_CAPTCHA':2,
-    'LOGIN':3,
-    'CHAT_ENCRYPT_C':4,
-    'AUTHENTICATE':6,
-    'CREATE_ROOM':5,
-    'CHAT_ACTION':7,
-    'ALTER_ROOM':8,
-    'LOGOUT':9
-}
+async def identify_client(websocket, SESSIONS):
+    return list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(websocket)]
+
+async def disconnect(ws, code, reason):
+    print(f"[INFO] CLIENT {ws.remote_address} DISCONNECTED due to",code,reason)
+    await ws.close(code=code, reason=reason)
+    return None
 
 async def establish_conn(SESSIONS, SERVER_CREDS, websocket, data):
     print(f"[INFO] Remote {websocket.remote_address} attempted connection")
@@ -63,11 +55,55 @@ async def establish_conn(SESSIONS, SERVER_CREDS, websocket, data):
         del SESSIONS[uuid]
         return None
 
-async def handle(SESSIONS, SERVER_CREDS, packet, ws):
-    type = packet['type']
-    data = packet['data']
+async def signup(SESSIONS, SERVER_CREDS, ws, data):
+    user = data['user']
+    email = data['email']
+    fullname = data['fullname']
+    password = data['password']
+    de_packet = {'type':'STATUS', 'data':{'sig':'NEW_ACC_OK', 'sigvresp':[user,email,fullname,password]}}
+    uuid = list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(ws)]
+    en_packet = en.encrypt_packet(pickle.dumps(de_packet), SESSIONS[uuid][1])
+    print(f"[INFO] CLIENT {uuid} ATTEMPTED SIGNUP WITH username {user}")
+    return en_packet
+
+upacket_map = {
+    'CONN_INIT':1,
+    'CONN_ENCRYPT_C':2
+}
+packet_map = { 
+    'SIGNUP':signup,
+    'S_CAPTCHA':2,
+    'LOGIN':3,
+    'CHAT_ENCRYPT_C':4,
+    'AUTHENTICATE':6,
+    'CREATE_ROOM':5,
+    'CHAT_ACTION':7,
+    'ALTER_ROOM':8,
+    'LOGOUT':9
+}
+
+async def handle(SESSIONS, SERVER_CREDS, ds_packet, ws):
+    if 'nonce' in ds_packet.keys():
+        sender = await identify_client(ws, SESSIONS)
+        try:
+            de_packet = en.decrypt_packet(ds_packet, SESSIONS[sender][1])
+            de_packet = pickle.loads(de_packet)
+        except:
+            await disconnect(ws, 1008, "Invalid Packet Structure")
+            return 'CONN_CLOSED'
+    elif 'type' in ds_packet.keys() and ds_packet['type'] not in packet_map.keys() and ds_packet['type'] in upacket_map.keys():
+        de_packet = ds_packet
+    elif ds_packet['type'] in packet_map.keys():
+        await disconnect(ws, 4004, f"The packet {ds_packet['type']} must be encrypted")
+        return 'CONN_CLOSED'
+    else:
+        await disconnect(ws, 1008, "Invalid Packet Structure")
+        return 'CONN_CLOSED'
+    type = de_packet['type']
+    data = de_packet['data']
     if type == 'CONN_INIT':
         return await establish_conn(SESSIONS, SERVER_CREDS, ws, data)
     else:
         func = packet_map[type]
         return await func(SESSIONS, SERVER_CREDS, ws, data)
+

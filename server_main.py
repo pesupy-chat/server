@@ -11,15 +11,6 @@ from yaml import safe_load as loadyaml
 from yaml import dump as dumpyaml
 
 
-async def disconnect(ws, code, reason):
-    print(f"[INFO] CLIENT {identify_client(ws)} DISCONNECTED due to",code,reason)
-    await ws.close(code=code, reason=reason)
-    return None
-
-async def identify_client(websocket):
-    global SESSIONS
-    return list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(websocket)]
-
 def check_missing_config(f, yaml, config):
     try:
         if yaml[config] is None:
@@ -47,7 +38,7 @@ def check_missing_config(f, yaml, config):
 def fill_missing_config(f, yaml, config):
     print(i18n.firstrun.fix_missing, config)
     yaml[config] = input('\n> ')
-    if config in ['listen_port', 'another_int']:
+    if config in ['listen_port', 'any_other_int_type_config']:
         yaml[config] = int(yaml[config])
     f.seek(0)
     f.write(dumpyaml(yaml))
@@ -55,41 +46,28 @@ def fill_missing_config(f, yaml, config):
 async def interpret(packet, websocket):
     global SESSIONS
     try:
-        sender = await identify_client(websocket)
+        sender = await p.identify_client(websocket, SESSIONS)
     except:
         pass
     ds_packet = pickle.loads(packet)
-    if 'nonce' in ds_packet.keys():
-        try:
-            de_packet = en.decrypt_packet(ds_packet, SESSIONS[sender][1])
-        except:
-            await disconnect(websocket, 1008, "Invalid Packet Structure")
-            return 'CONN_CLOSED'
-    elif 'type' in ds_packet.keys() and ds_packet['type'] not in p.packet_map.keys() and ds_packet['type'] in p.upacket_map.keys():
-        de_packet = ds_packet
-    elif ds_packet['type'] in p.packet_map.keys():
-        await disconnect(websocket, 4004, f"The packet {ds_packet['type']} must be encrypted")
-        return 'CONN_CLOSED'
-    else:
-        await disconnect(websocket, 1008, "Invalid Packet Structure")
-        return 'CONN_CLOSED'
-    return await p.handle(SESSIONS, SERVER_CREDS, de_packet, websocket) # return handler(sender, type, data)
+    return await p.handle(SESSIONS, SERVER_CREDS, ds_packet, websocket) # return handler(sender, type, data)
 
 async def catch(websocket):
     # Handle further incoming packets
-    try:
+#    try:
         while True:
             result = await interpret(await websocket.recv(), websocket)
             if result == 'CONN_CLOSED':
                 pass
             else:
                 await websocket.send(result)
+                print('Sent', result)
     # Handle disconnection due to any exception
-    except Exception as err3:
-        client = await identify_client(websocket)
-        print(f"[INFO] CLIENT {client} DISCONNECTED due to\n\t",err3)
-        del SESSIONS[client]
-        return None
+#    except Exception as err3:
+#        client = await p.identify_client(websocket, SESSIONS)
+#        print(f"[INFO] CLIENT {client} DISCONNECTED due to\n\t",err3)
+#        del SESSIONS[client]
+#        return None
 
 async def main(host, port):
     async with websockets.serve(
@@ -143,3 +121,4 @@ if __name__ == "__main__":
         asyncio.run(main(host,port))
     except KeyboardInterrupt:
         print('\n[INFO] Goodbye!')
+        sys.exit()
