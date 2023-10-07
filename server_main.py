@@ -21,28 +21,28 @@ async def identify_client(websocket):
     return list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(websocket)]
 
 def check_missing_config(f, yaml, config):
-    if config == 'working_directory':
-        print(i18n.firstrun.prompt1+config, i18n.firstrun.prompt2, sep='\n', end='\n')
-        while True:
-            choice = input("(Y / N) > ")
-            if choice.lower() == 'y':
-                print(i18n.firstrun.exec)
-                f.close()
-                os.remove(f'{rootdir}/config.yml')
-                firstrun.main()
-                print(i18n.firstrun.exit)
-                sys.exit()
-            elif choice.lower() == 'n':
-                fill_missing_config(f, yaml, 'working_directory')
-                break
-    else:
-        try:
-            if yaml[config] is None:
-                print(i18n.firstrun.prompt1+config)
-                fill_missing_config(f, yaml, config)
-        except KeyError:
+    try:
+        if yaml[config] is None:
             print(i18n.firstrun.prompt1+config)
-            fill_missing_config(f, yaml, config)
+            if config == 'working_directory':
+                print(i18n.firstrun.prompt2)
+                while True:
+                    choice = input("(Y / N) > ")
+                    if choice.lower() == 'y':
+                        print(i18n.firstrun.exec)
+                        f.close()
+                        os.remove(f'{rootdir}/config.yml')
+                        firstrun.main()
+                        print(i18n.firstrun.exit)
+                        sys.exit()
+                    elif choice.lower() == 'n':
+                        fill_missing_config(f, yaml, 'working_directory')
+                        break
+            else:
+                fill_missing_config(f, yaml, config)
+    except KeyError:
+        print(i18n.firstrun.prompt1+config)
+        fill_missing_config(f, yaml, config)
 
 def fill_missing_config(f, yaml, config):
     print(i18n.firstrun.fix_missing, config)
@@ -139,4 +139,7 @@ if __name__ == "__main__":
     SERVER_CREDS['server_epbkey'] = en.ser_key_pem(server_epbkey, 'public')
 
     print("[INFO] SERVER ONLINE!")
-    asyncio.run(main(host,port))
+    try:
+        asyncio.run(main(host,port))
+    except KeyboardInterrupt:
+        print('\n[INFO] Goodbye!')
