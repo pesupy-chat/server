@@ -4,6 +4,8 @@ import pickle
 from . import encryption as en
 from uuid import UUID
 from cryptography.hazmat.primitives import serialization as s
+from captcha.image import ImageCaptcha
+from random import randint
 
 async def identify_client(websocket, SESSIONS):
     return list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(websocket)]
@@ -12,6 +14,9 @@ async def disconnect(ws, code, reason):
     print(f"[INFO] CLIENT {ws.remote_address} DISCONNECTED due to",code,reason)
     await ws.close(code=code, reason=reason)
     return None
+
+async def get_packet(ws, type):
+    # packet validator
 
 async def establish_conn(SESSIONS, SERVER_CREDS, websocket, data):
     print(f"[INFO] Remote {websocket.remote_address} attempted connection")
@@ -54,17 +59,36 @@ async def establish_conn(SESSIONS, SERVER_CREDS, websocket, data):
         await websocket.close(code = 1003, reason = "Connection Ephemeral Public Key in invalid format")
         del SESSIONS[uuid]
         return None
+    
+async def send_packet(SESSIONS, ws, de_packet):
+    uuid = list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(ws)]
+    en_packet = en.encrypt_packet(pickle.dumps(de_packet), SESSIONS[uuid][1])
+    return en_packet
 
 async def signup(SESSIONS, SERVER_CREDS, ws, data):
     user = data['user']
     email = data['email']
     fullname = data['fullname']
-    password = data['password']
+    # add captcha
+    password = en.salt(data['password'])
     de_packet = {'type':'STATUS', 'data':{'sig':'NEW_ACC_OK', 'sigvresp':[user,email,fullname,password]}}
-    uuid = list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(ws)]
-    en_packet = en.encrypt_packet(pickle.dumps(de_packet), SESSIONS[uuid][1])
-    print(f"[INFO] CLIENT {uuid} ATTEMPTED SIGNUP WITH username {user}")
-    return en_packet
+#    print(f"[INFO] CLIENT {uuid} ATTEMPTED SIGNUP WITH username {user}")
+    return await send_packet(SESSIONS, ws, de_packet)
+
+async def captcha(SESSIONS, SERVER_CREDS, ws, data):
+    uuid = identify_client(ws, SESSIONS)
+    challenge = str(randint(100000,999999))
+    data = ImageCaptcha().generate(challenge)
+    image = data.getvalue()
+    de_packet = pickle.dumps({'type':'CAPTCHA', 'data':{'challenge':image}})
+    ws.send(await send_packet(SESSIONS, ws, de_packet))
+    resp = await ws.recv()
+    de_resp = pickle.loads(en.decrypt_packet(pickle.loads(resp), SESSIONS[uuid][1]))
+    de_resp = de_resp['solved']
+    if de_resp == challenge:
+        return True
+    else:
+        return False
 
 upacket_map = {
     'CONN_INIT':1,
