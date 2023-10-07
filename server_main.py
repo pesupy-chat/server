@@ -65,8 +65,11 @@ async def interpret(packet, websocket):
         except:
             await disconnect(websocket, 1008, "Invalid Packet Structure")
             return 'CONN_CLOSED'
-    elif 'type' in ds_packet.keys():
+    elif 'type' in ds_packet.keys() and ds_packet['type'] not in p.packet_map.keys() and ds_packet['type'] in p.upacket_map.keys():
         de_packet = ds_packet
+    elif ds_packet['type'] in p.packet_map.keys():
+        await disconnect(websocket, 4004, f"The packet {ds_packet['type']} must be encrypted")
+        return 'CONN_CLOSED'
     else:
         await disconnect(websocket, 1008, "Invalid Packet Structure")
         return 'CONN_CLOSED'
