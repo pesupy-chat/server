@@ -3,3 +3,4 @@ websockets
 uuid
 pyyaml
 cryptography
+captcha
