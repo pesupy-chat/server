@@ -49,11 +49,10 @@ async def interpret(packet, websocket):
         sender = await p.identify_client(websocket, SESSIONS)
     except:
         pass
-    ds_packet = pickle.loads(packet)
-    return await p.handle(SESSIONS, SERVER_CREDS, ds_packet, websocket) # return handler(sender, type, data)
+    return await p.handle(SESSIONS, SERVER_CREDS, packet, websocket) # return handler(sender, type, data)
 
 async def catch(websocket):
-    # Handle further incoming packets
+    # Handle incoming packets
 #    try:
         while True:
             result = await interpret(await websocket.recv(), websocket)
@@ -112,7 +111,7 @@ if __name__ == "__main__":
         print(i18n.firstrun.exit)
         sys.exit()
 
-    server_eprkey, server_epbkey = en.create_key_pair()
+    server_eprkey, server_epbkey = en.create_conn_key_pair()
     SERVER_CREDS['server_eprkey'] = server_eprkey
     SERVER_CREDS['server_epbkey'] = en.ser_key_pem(server_epbkey, 'public')
 
