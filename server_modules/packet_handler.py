@@ -66,9 +66,14 @@ async def send_packet(SESSIONS, ws, de_packet):
 
 async def signup(SESSIONS, SERVER_CREDS, ws, data):
     uuid = list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(ws)]
-    user = data['user']
-    email = data['email']
-    fullname = data['fullname']
+    try:
+        user = data['user']
+        email = data['email']
+        fullname = data['fullname']
+        dob = data['dob']
+        password = data['password']
+    except KeyError as ero:
+        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_MISSING_CREDS','desc':ero}})
     if len(user) > 32:
         return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_USERNAME_ABOVE_LIMIT'}})
     if len(email) > 256:
@@ -78,9 +83,13 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
     resp_captcha = await captcha(SESSIONS, SERVER_CREDS, ws, data)
     if resp_captcha == True:
         print(f"[INFO] CLIENT {uuid} ATTEMPTED SIGNUP WITH username {user}")
-        password = en.salt(data['password'])
-        db.create_account()
-        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_OK'}})
+        salted_pwd = en.salt_pwd(password)
+        try:
+            db.Account.create(user, fullname, dob, email, salted_pwd)
+        except Exception as errr:
+            return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_ERR','desc':errr}})
+        else:
+            return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_OK'}})
     elif resp_captcha == False:
         return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CAPTCHA_WRONG'}})
 
@@ -91,19 +100,17 @@ async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     challenge = str(randint(100000,999999))
     data = ImageCaptcha().generate(challenge)
     image = data.getvalue()
-    print('captcha image', image)
+
     packet = en.encrypt_packet({'type':'CAPTCHA', 'data':{'challenge':image}}, SESSIONS[uuid][1])
     await ws.send(packet)
     print(f"[INFO] GENERATED CAPTCHA FOR CLIENT {uuid} with CODE {challenge}")
     resp = await ws.recv()
+
     # handle possible INVALID_PACKET in next line 
     de_resp = pickle.loads(en.decrypt_packet(resp, SERVER_CREDS['server_eprkey']))
     de_resp = de_resp['data']['solved']
     print("CLIENT DERESP", de_resp)
-    if int(de_resp) == int(challenge):
-        return True
-    else:
-        return False
+    return int(de_resp) == int(challenge)
 
 upacket_map = {
     'CONN_INIT':1,

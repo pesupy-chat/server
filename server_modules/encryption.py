@@ -141,3 +141,38 @@ def decrypt_packet(encrypted_data, privkey):
         return pickle.loads(data)
     except Exception as error:
         return {'type':'decrypt_error','data':f'{error}'}
+    
+def salt_pwd(password):
+    pwd = password.encode()
+    salt = urandom(16)
+
+    # Derive a key from the password
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+        backend=default_backend()
+    )
+    key = urlsafe_b64encode(kdf.derive(password))
+
+    # Store the salt and key in your database
+    return pickle.dumps({'salt':salt, 'key':key})
+
+def db_check_pwd(pwd, saltedpwd):
+    salted_pwd = pickle.loads(saltedpwd)
+    salt, key = salted_pwd['salt'], salted_pwd['key']
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+        backend=default_backend()
+    )
+    provided_key = urlsafe_b64encode(kdf.derive(pwd))
+
+    # Check if the provided key matches the stored key
+    if provided_key == key:
+        return True
+    else:
+        return False

@@ -3,6 +3,7 @@ import getpass
 from i18n import firstrun
 from . import encryption as e
 from . import db_handler
+from os import urandom
 import pickle 
 from yaml import dump as dumpyaml
 try: 
