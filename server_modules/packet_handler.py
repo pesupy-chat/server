@@ -2,6 +2,7 @@ from uuid import UUID
 import asyncio
 import pickle
 from . import encryption as en
+from . import db_handler as db
 from uuid import UUID
 from cryptography.hazmat.primitives import serialization as s
 from captcha.image import ImageCaptcha
@@ -68,13 +69,19 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
     user = data['user']
     email = data['email']
     fullname = data['fullname']
+    if len(user) > 32:
+        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_USERNAME_ABOVE_LIMIT'}})
+    if len(email) > 256:
+        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_EMAIL_ABOVE_LIMIT'}})
+    if len(fullname) > 256:
+        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_NAME_ABOVE_LIMIT'}})
     resp_captcha = await captcha(SESSIONS, SERVER_CREDS, ws, data)
-    if resp_captcha is True:
-        password = en.salt(data['password'])
-        de_packet = {'type':'STATUS', 'data':{'sig':'NEW_ACC_OK', 'sigvresp':[user,email,fullname,password]}}
+    if resp_captcha == True:
         print(f"[INFO] CLIENT {uuid} ATTEMPTED SIGNUP WITH username {user}")
+        password = en.salt(data['password'])
+        db.create_account()
         return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_OK'}})
-    elif resp_captcha is False:
+    elif resp_captcha == False:
         return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CAPTCHA_WRONG'}})
 
     
@@ -85,12 +92,15 @@ async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     data = ImageCaptcha().generate(challenge)
     image = data.getvalue()
     print('captcha image', image)
-    await ws.send(pickle.dumps({'type':'CAPTCHA', 'data':{'challenge':image}}))
+    packet = en.encrypt_packet({'type':'CAPTCHA', 'data':{'challenge':image}}, SESSIONS[uuid][1])
+    await ws.send(packet)
+    print(f"[INFO] GENERATED CAPTCHA FOR CLIENT {uuid} with CODE {challenge}")
     resp = await ws.recv()
     # handle possible INVALID_PACKET in next line 
     de_resp = pickle.loads(en.decrypt_packet(resp, SERVER_CREDS['server_eprkey']))
-    de_resp = de_resp['solved']
-    if de_resp == challenge:
+    de_resp = de_resp['data']['solved']
+    print("CLIENT DERESP", de_resp)
+    if int(de_resp) == int(challenge):
         return True
     else:
         return False
@@ -101,7 +111,6 @@ upacket_map = {
 }
 packet_map = {
     'SIGNUP':signup,
-    'S_CAPTCHA':2,
     'LOGIN':3,
     'CHAT_ENCRYPT_C':4,
     'AUTHENTICATE':6,

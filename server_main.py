@@ -53,7 +53,7 @@ async def interpret(packet, websocket):
 
 async def catch(websocket):
     # Handle incoming packets
-#    try:
+    try:
         while True:
             result = await interpret(await websocket.recv(), websocket)
             if result == 'CONN_CLOSED':
@@ -62,11 +62,11 @@ async def catch(websocket):
                 await websocket.send(result)
                 print('Sent', result)
     # Handle disconnection due to any exception
-#    except Exception as err3:
-#        client = await p.identify_client(websocket, SESSIONS)
-#        print(f"[INFO] CLIENT {client} DISCONNECTED due to\n\t",err3)
-#        del SESSIONS[client]
-#        return None
+    except Exception as err3:
+        client = await p.identify_client(websocket, SESSIONS)
+        print(f"[INFO] CLIENT {client} DISCONNECTED due to\n\t",err3)
+        del SESSIONS[client]
+        return None
 
 async def main(host, port):
     async with websockets.serve(
