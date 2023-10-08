@@ -1,6 +1,10 @@
 asyncio
-websockets
-uuid
-pyyaml
-cryptography
 captcha
+cffi
+cryptography
+mysql-connector
+Pillow
+pycparser
+PyYAML
+uuid
+websockets

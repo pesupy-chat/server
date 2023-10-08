@@ -76,6 +76,7 @@ def main():
     db_handler.decrypt_creds(e.fermat_gen(workingdir), workingdir)
     print(firstrun.initialize_db)
     db_handler.initialize_schemas()
+    db_handler.save_salt()
     host = input("Enter Server Listen Address: ")
     port = int(input("Enter Server Listen Port: "))
     with open(f'{os.path.dirname(os.path.abspath(__file__))}/../config.yml', 'w') as fi:
