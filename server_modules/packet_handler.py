@@ -7,6 +7,7 @@ from uuid import UUID
 from cryptography.hazmat.primitives import serialization as s
 from captcha.image import ImageCaptcha
 from random import randint
+import datetime
 
 async def identify_client(websocket, SESSIONS):
     return list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(websocket)]
@@ -70,7 +71,7 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
         user = data['user']
         email = data['email']
         fullname = data['fullname']
-        dob = data['dob']
+        dob = date.strpdata['dob']
         password = data['password']
     except KeyError as ero:
         return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_MISSING_CREDS','desc':ero}})
@@ -80,6 +81,10 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
         return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_EMAIL_ABOVE_LIMIT'}})
     if len(fullname) > 256:
         return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_NAME_ABOVE_LIMIT'}})
+    if len(dob) > 10:
+        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_DOB_INVALID'}})
+    if len(password) > 384:
+        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_PASSWORD_ABOVE_LIMIT'}})
     resp_captcha = await captcha(SESSIONS, SERVER_CREDS, ws, data)
     if resp_captcha == True:
         print(f"[INFO] CLIENT {uuid} ATTEMPTED SIGNUP WITH username {user}")
@@ -109,7 +114,6 @@ async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     # handle possible INVALID_PACKET in next line 
     de_resp = pickle.loads(en.decrypt_packet(resp, SERVER_CREDS['server_eprkey']))
     de_resp = de_resp['data']['solved']
-    print("CLIENT DERESP", de_resp)
     return int(de_resp) == int(challenge)
 
 upacket_map = {

@@ -1,9 +1,8 @@
-from json import loads
 import mysql.connector as sqltor
-from uuid import uuid4, UUID
+from uuid import uuid4
 import pickle
 from . import encryption as en
-from os import urandom
+
 
 
 initialize_ddl = """CREATE DATABASE IF NOT EXISTS chatapp_accounts;
