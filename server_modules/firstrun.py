@@ -2,7 +2,6 @@ import os
 import getpass
 from i18n import firstrun
 from . import encryption as e
-from . import db_handler
 from os import urandom
 import pickle 
 from yaml import dump as dumpyaml
@@ -10,6 +9,9 @@ try:
     from tkinter import filedialog
 except:
     pass
+
+class working_dir():
+    workingdir = ''
 
 def get_server_dir():
     while True:
@@ -69,14 +71,10 @@ def main():
     print(firstrun.welcome_message)
     print(firstrun.setup_server_dir)
     workingdir = setup_server_dir()
+    setattr(working_dir, 'workingdir', workingdir)
     fkey = e.fernet_initkey(workingdir)
     save_db_credentials(fkey,workingdir)
     del fkey
-    print(firstrun.security)
-    db_handler.decrypt_creds(e.fermat_gen(workingdir), workingdir)
-    print(firstrun.initialize_db)
-    db_handler.initialize_schemas()
-    db_handler.save_salt()
     host = input("Enter Server Listen Address: ")
     port = int(input("Enter Server Listen Port: "))
     with open(f'{os.path.dirname(os.path.abspath(__file__))}/../config.yml', 'w') as fi:
