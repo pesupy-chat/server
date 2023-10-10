@@ -7,7 +7,7 @@
 |s|server-epbkey|{'type':'CONN_ENCRYPT_S', 'data':{'server_epbkey':pem}}|
 |c|client-epbkey|{'type':'CONN_ENCRYPT_C', 'data':{'client_epbkey':pem}}|
 |s|con-established|{'type':'STATUS', 'data':{'sig':'CONN_OK'}}|
-|c|signup|{'type':'SIGNUP', 'data':{'user':'username','email':'email','fullname':'fullname','password':'password'}}|
+|c|signup|{'type':'SIGNUP', 'data':{'user':'username','email':'email','fullname':'fullname','dob':dob,'password':'password'}}|
 |s|captcha|{'type':'CAPTCHA', 'data':{'challenge':captcha}}|
 |c|captcha-response|{'type':'S_CAPTCHA', 'data':{'solved':captcha_resp}}|
 |s|creation-OK|{'type':'STATUS', 'data':{'sig':'NEW_ACC_OK'}}|

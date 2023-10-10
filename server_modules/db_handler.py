@@ -43,7 +43,7 @@ class DBHandler:
             for i in query:
                 self.cur.execute(i)
                 self.con.commit()
-                print('[INFO]',i) # print('[INFO] Created schemas successfully')
+                print('[DEBUG]',i) # print('[INFO] Created schemas successfully')
         except Exception as error:
             print('[ERROR] Failed to create schemas:', error)
 

@@ -154,7 +154,7 @@ def salt_pwd(password):
         iterations=100000,
         backend=default_backend()
     )
-    key = urlsafe_b64encode(kdf.derive(password))
+    key = urlsafe_b64encode(kdf.derive(pwd))
 
     # Store the salt and key in your database
     return pickle.dumps({'salt':salt, 'key':key})
