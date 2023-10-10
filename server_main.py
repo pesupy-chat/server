@@ -3,7 +3,7 @@ import asyncio
 import websockets
 from server_modules import firstrun
 from server_modules import encryption as en
-from server_modules import db_handler as sql
+from server_modules import db_handler as db
 from server_modules import packet_handler as p
 import pickle
 import i18n
@@ -13,7 +13,6 @@ from yaml import dump as dumpyaml
 def execute_firstrun():
     firstrun.main()
     print(i18n.firstrun.security)
-    db = sql.DBHandler()
     db.decrypt_creds(en.fermat_gen(firstrun.working_dir.workingdir), firstrun.working_dir.workingdir)
     print(i18n.firstrun.initialize_db)
     db.initialize_schemas()
@@ -70,7 +69,6 @@ async def catch(websocket):
                 pass
             else:
                 await websocket.send(result)
-                print('Sent', result)
     # Handle disconnection due to any exception
     except Exception as err3:
         client = await p.identify_client(websocket, SESSIONS)
@@ -104,13 +102,13 @@ if __name__ == "__main__":
         check_missing_config(f, yaml, 'listen_address')
         check_missing_config(f, yaml, 'listen_port')
         if os.path.exists(f"{yaml['working_directory']}/creds/db") == False:
-            raise ValueError("Could not find db credentials")
+            raise TypeError("DB_CREDS_NOT_FOUND")
         f.close()
 
     except FileNotFoundError as err:
         print(i18n.firstrun.config_not_found, i18n.firstrun.exec)
         execute_firstrun()
-    except ValueError:
+    except TypeError:
         print("Could not find database credentials. Server will now run its configuration process again")
         execute_firstrun()
 
@@ -118,7 +116,6 @@ if __name__ == "__main__":
     host, port = yaml['listen_address'], yaml['listen_port']
 
     try:
-        db = sql.DBHandler()
         db.decrypt_creds(en.fermat_gen(workingdir), workingdir)
     except Exception as w:
         print("Error while decrypting database credentials. Check your password\n",w)
@@ -134,6 +131,7 @@ if __name__ == "__main__":
         asyncio.run(main(host,port))
     except KeyboardInterrupt:
         print('\n[INFO] Goodbye!')
+        db.close()
         sys.exit()
 
 

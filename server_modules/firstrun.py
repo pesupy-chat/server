@@ -21,7 +21,7 @@ def get_server_dir():
             spath = filedialog.askdirectory()
         except:
             print(firstrun.savedata.nogui)
-            spath = input()
+            spath = input().rstrip('/\\')
         finally:
             break
     return spath
