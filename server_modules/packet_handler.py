@@ -71,7 +71,7 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
         user = data['user']
         email = data['email']
         fullname = data['fullname']
-        dob = date.strpdata['dob']
+        dob = data['dob']
         password = data['password']
     except KeyError as ero:
         return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_MISSING_CREDS','desc':ero}})
