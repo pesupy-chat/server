@@ -64,10 +64,9 @@ class Account(db):
         print("[DEBUG]",query)
         db.cur.execute(query)
         db.con.commit()
-        pwd_query_args = (uuid, salted_pwd)
-        pwd_query = "INSERT INTO chatapp_accounts.auth(UUID, SALTED_HASHBROWN) VALUES (%s, %s)"
-        print("[DEBUG]",pwd_query_args,pwd_query)
-        db.cur.execute(pwd_query, pwd_query_args)
+        pwd_query = f"INSERT INTO chatapp_accounts.auth(UUID, SALTED_HASHBROWN) VALUES ('{uuid}', {str(salted_pwd).lstrip('b')})"
+        print("[DEBUG]", pwd_query)
+        db.cur.execute(pwd_query)
     def set_pubkey(user, key):
         db.cur.execute(f"INSERT INTO chatapp_accounts.pubkeys VALUES('{user}',{key})")
     def check_pwd(pwd, identifier):
