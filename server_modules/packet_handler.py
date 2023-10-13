@@ -71,12 +71,14 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
         user = data['user']
         email = data['email']
         fullname = data['fullname']
-        dob = data['dob']
+        dob = datetime.strpdata['dob']
         password = data['password']
     except KeyError as ero:
         return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_MISSING_CREDS','desc':ero}})
     if len(user) > 32:
         return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_USERNAME_ABOVE_LIMIT'}})
+    if db.check_if_exists(user, 'username'):
+        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_USERNAME_ALREADY_EXISTS'}})
     if len(email) > 256:
         return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_EMAIL_ABOVE_LIMIT'}})
     if len(fullname) > 256:
@@ -98,7 +100,16 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
     elif resp_captcha == False:
         return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CAPTCHA_WRONG'}})
 
-    
+async def login(SESSIONS, SERVER_CREDS, ws, data):
+    identifier = data['id']
+    password = data['password']
+    flag = db.Account.check_pwd(password, identifier)
+    if flag == True:
+        # token auth
+    elif flag == False:
+        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_INCORRECT_PASSWORD'}})
+    elif flag == 'ACCOUNT_DNE':
+        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_ACCOUNT_NOT_FOUND'}})
 
 async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     uuid = await identify_client(ws, SESSIONS)

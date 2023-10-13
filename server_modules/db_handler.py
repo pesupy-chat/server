@@ -7,7 +7,7 @@ from . import encryption as en
 
 initialize_ddl = """CREATE DATABASE IF NOT EXISTS chatapp_accounts;
 USE chatapp_accounts;
-CREATE TABLE IF NOT EXISTS users(UUID char(36) NOT NULL, USERNAME varchar(32) NOT NULL, FULL_NAME varchar(80) NOT NULL, DOB date NOT NULL, EMAIL varchar(32) DEFAULT NULL, CREATION timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (UUID));
+CREATE TABLE IF NOT EXISTS users(UUID char(36) NOT NULL, USERNAME varchar(32) UNIQUE NOT NULL, FULL_NAME varchar(80) NOT NULL, DOB date NOT NULL, EMAIL varchar(32) DEFAULT NULL, CREATION timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (UUID));
 CREATE TABLE IF NOT EXISTS auth(UUID char(36) NOT NULL, SALTED_HASHBROWN blob NOT NULL, TOKEN tinytext, EXPIRY timestamp, KEY authUUID (UUID), CONSTRAINT authUUID FOREIGN KEY (UUID) REFERENCES users (UUID));
 CREATE TABLE IF NOT EXISTS pubkeys(UUID char(36) NOT NULL, PUBKEY blob NOT NULL, KEY UUID (UUID), CONSTRAINT UUID FOREIGN KEY (UUID) REFERENCES users (UUID) ON DELETE CASCADE ON UPDATE CASCADE);
 CREATE DATABASE IF NOT EXISTS chatapp_chats;
@@ -18,6 +18,7 @@ USE chatapp_internal;
 CREATE TABLE IF NOT EXISTS settings (PARAM varchar(64) NOT NULL, VALUE varchar(256) NOT NULL);"""
 
 queries = {'initialize': initialize_ddl}
+fields_to_check = {'username':{'table':'chatapp_accounts.users','attribute':'USERNAME'}}
 class db:
     con = None
     cur = None
@@ -45,42 +46,59 @@ def initialize_schemas():
     except Exception as error:
         print('[ERROR] Failed to create schemas:', error)
 
+def check_if_exists(value, field):
+    col = fields_to_check[field]['attribute']
+    table = fields_to_check[field]['table']
+    db.cur.execute(f"select {col} from {table} where {col} = {value}")
+    data = db.cur.fetchall() 
+    if data[0][0] == value:
+        return True
+    else:
+        return False
+
+def get_uuid(user):
+    db.cur.execute("SELECT UUID FROM chatapp_accounts.users WHERE USERNAME = %s", (user,))
+    data = db.cur.fetchall()
+    return data[0][0]
+
 def close():
     if db.con is not None:
         db.con.close()
 class Config(db):
     def update(setting, config):
-        db.cur.execute(f"INSERT INTO chatapp_internal.settings VALUES ('{setting}','{config}')")
+        db.cur.execute("INSERT INTO chatapp_internal.settings VALUES (%s, %s)", (setting, config))
         db.con.commit()
+    
     def read(setting):
-        db.cur.execute(f"SELECT VALUE FROM chatapp_internal.settings WHERE PARAM = '{setting}'")
+        db.cur.execute("SELECT VALUE FROM chatapp_internal.settings WHERE PARAM = %s", (setting,))
         return db.cur.fetchall()[0][0]
 
 class Account(db):
     def create(username, fullname, dob, email, salted_pwd):
         # UUID, USERNAME, FULL_NAME, DOB, EMAIL, CREATION
         uuid = str(uuid4())
-        query = f"INSERT INTO chatapp_accounts.users(UUID, USERNAME, FULL_NAME, DOB, EMAIL) VALUES ('{uuid}', '{username}', '{fullname}', '{dob}', '{email}')"
-        print("[DEBUG]",query)
-        db.cur.execute(query)
+        query = "INSERT INTO chatapp_accounts.users(UUID, USERNAME, FULL_NAME, DOB, EMAIL) VALUES (%s, %s, %s, %s, %s)"
+        print(f"[DEBUG | for {uuid}]",query)
+        db.cur.execute(query, (uuid, username, fullname, dob, email))
         db.con.commit()
-        pwd_query = f"INSERT INTO chatapp_accounts.auth(UUID, SALTED_HASHBROWN) VALUES ('{uuid}', {str(salted_pwd).lstrip('b')})"
-        print("[DEBUG]", pwd_query)
-        db.cur.execute(pwd_query)
+        pwd_query = "INSERT INTO chatapp_accounts.auth(UUID, SALTED_HASHBROWN) VALUES (%s, %s)"
+        print(f"[DEBUG | for {uuid}]", pwd_query)
+        db.cur.execute(pwd_query, (uuid, salted_pwd))
+    
     def set_pubkey(user, key):
-        db.cur.execute(f"INSERT INTO chatapp_accounts.pubkeys VALUES('{user}',{key})")
+        db.cur.execute("INSERT INTO chatapp_accounts.pubkeys VALUES(%s, %s)", (user, key))
+    
     def check_pwd(pwd, identifier):
         try:
             if '@' not in identifier:
-                db.cur.execute(f"SELECT UUID FROM chatapp_accounts.users WHERE USERNAME={identifier}")
+                db.cur.execute("SELECT UUID FROM chatapp_accounts.users WHERE USERNAME=%s", (identifier,))
                 uuid = db.cur.fetchall()[0][0]
             elif '@' in identifier:
-                db.cur.execute(f"SELECT UUID FROM chatapp_accounts.users WHERE EMAIL={identifier}")
+                db.cur.execute("SELECT UUID FROM chatapp_accounts.users WHERE EMAIL=%s", (identifier,))
                 uuid = db.cur.fetchall()[0][0]
         except IndexError:
             return 'ACCOUNT_DNE'
-
-        db.cur.execute(f"SELECT SALTED_HASHBROWN FROM chatapp_accounts.auth WHERE UUID={uuid}")
+        db.cur.execute("SELECT SALTED_HASHBROWN FROM chatapp_accounts.auth WHERE UUID = %s", (uuid,))
         saltedpwd = db.cur.fetchall()[0][0]
         flag = en.db_check_pwd(pwd, saltedpwd)
         return flag

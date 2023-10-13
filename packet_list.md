@@ -11,7 +11,7 @@
 |s|captcha|{'type':'CAPTCHA', 'data':{'challenge':captcha}}|
 |c|captcha-response|{'type':'S_CAPTCHA', 'data':{'solved':captcha_resp}}|
 |s|creation-OK|{'type':'STATUS', 'data':{'sig':'NEW_ACC_OK'}}|
-|c|login|{'type':'LOGIN', 'data':{'user':username,'pass':password}}|
+|c|login|{'type':'LOGIN', 'data':{'id':username/email,'password':password}}|
 |c|client-chatpubkey|{'type':'CHAT_ENCRYPT_C', 'data':{'chat_pubkey':pem}}|
 |s|session-token-gen|{'type':'AUTH_TOKEN_GEN', 'data':{'token':token}}|
 |c|session-token-auth|{'type':'AUTHENTICATE', 'data':{'token':token}}|
