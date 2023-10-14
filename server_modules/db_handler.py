@@ -8,7 +8,7 @@ from . import encryption as en
 initialize_ddl = """CREATE DATABASE IF NOT EXISTS chatapp_accounts;
 USE chatapp_accounts;
 CREATE TABLE IF NOT EXISTS users(UUID char(36) NOT NULL, USERNAME varchar(32) UNIQUE NOT NULL, FULL_NAME varchar(80) NOT NULL, DOB date NOT NULL, EMAIL varchar(32) DEFAULT NULL, CREATION timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (UUID));
-CREATE TABLE IF NOT EXISTS auth(UUID char(36) NOT NULL, SALTED_HASHBROWN blob NOT NULL, TOKEN tinytext, EXPIRY timestamp, KEY authUUID (UUID), CONSTRAINT authUUID FOREIGN KEY (UUID) REFERENCES users (UUID));
+CREATE TABLE IF NOT EXISTS auth(UUID char(36) NOT NULL, SALTED_HASHBROWN blob NOT NULL, TOKEN_SECRET tinytext, KEY authUUID (UUID), CONSTRAINT authUUID FOREIGN KEY (UUID) REFERENCES users (UUID));
 CREATE TABLE IF NOT EXISTS pubkeys(UUID char(36) NOT NULL, PUBKEY blob NOT NULL, KEY UUID (UUID), CONSTRAINT UUID FOREIGN KEY (UUID) REFERENCES users (UUID) ON DELETE CASCADE ON UPDATE CASCADE);
 CREATE DATABASE IF NOT EXISTS chatapp_chats;
 USE chatapp_chats;
@@ -18,7 +18,9 @@ USE chatapp_internal;
 CREATE TABLE IF NOT EXISTS settings (PARAM varchar(64) NOT NULL, VALUE varchar(256) NOT NULL);"""
 
 queries = {'initialize': initialize_ddl}
-fields_to_check = {'username':{'table':'chatapp_accounts.users','attribute':'USERNAME'}}
+fields_to_check = {
+    'username':{'table':'chatapp_accounts.users','attribute':'USERNAME'}
+    }
 class db:
     con = None
     cur = None
@@ -56,6 +58,14 @@ def check_if_exists(value, field):
     else:
         return False
 
+def check_pubkey(uuid):
+    db.cur.execute(f"SELECT PUBKEY FROM chatapp_accounts.pubkeys WHERE UUID = {uuid}")
+    data = db.cur.fetchall()
+    if len(data) == 0:
+        return False
+    elif len(data) == 1:
+        return True
+
 def get_uuid(user):
     db.cur.execute("SELECT UUID FROM chatapp_accounts.users WHERE USERNAME = %s", (user,))
     data = db.cur.fetchall()
@@ -84,9 +94,11 @@ class Account(db):
         pwd_query = "INSERT INTO chatapp_accounts.auth(UUID, SALTED_HASHBROWN) VALUES (%s, %s)"
         print(f"[DEBUG | for {uuid}]", pwd_query)
         db.cur.execute(pwd_query, (uuid, salted_pwd))
+        db.con.commit()
     
     def set_pubkey(user, key):
         db.cur.execute("INSERT INTO chatapp_accounts.pubkeys VALUES(%s, %s)", (user, key))
+        db.con.commit()
     
     def check_pwd(pwd, identifier):
         try:
@@ -101,4 +113,8 @@ class Account(db):
         db.cur.execute("SELECT SALTED_HASHBROWN FROM chatapp_accounts.auth WHERE UUID = %s", (uuid,))
         saltedpwd = db.cur.fetchall()[0][0]
         flag = en.db_check_pwd(pwd, saltedpwd)
-        return flag
+        return (flag, uuid)
+
+    def set_token(uuid, secret):
+        db.cur.execute("INSERT INTO chatapp_accounts.auth(UUID, TOKEN_SECRET) VALUES(%s, %s)", (uuid, secret))
+        db.con.commit()

@@ -9,11 +9,14 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 #from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 #from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidSignature
+from secrets import token_hex
 from getpass import getpass
 from os import urandom
 from base64 import urlsafe_b64encode
 import pickle
 import i18n
+import jwt
+import datetime
 
 #def create_key_pair():
 #    private_key_d = ec.generate_private_key(ec.SECP256K1())
@@ -151,7 +154,7 @@ def salt_pwd(password):
         algorithm=hashes.SHA256(),
         length=32,
         salt=salt,
-        iterations=100000,
+        iterations=600000,
         backend=default_backend()
     )
     key = urlsafe_b64encode(kdf.derive(pwd))
@@ -176,3 +179,19 @@ def db_check_pwd(pwd, saltedpwd):
         return True
     else:
         return False
+    
+def gen_token(user, validity):
+    """
+    `validity` in days
+    """
+    secret = token_hex(32)
+    payload = {
+        "sub": user,
+        "iat": datetime.datetime.utcnow(),
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(days = validity)
+    }
+    access_token = jwt.encode(payload, secret, algorithm="RS256")
+    return (secret, access_token)
+
+def validate_token(user, token):
+    

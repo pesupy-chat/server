@@ -20,47 +20,47 @@ async def disconnect(ws, code, reason):
 #async def get_packet(ws, type):
 #    # packet validator
 
-async def establish_conn(SESSIONS, SERVER_CREDS, websocket, data):
-    print(f"[INFO] Remote {websocket.remote_address} attempted connection")
+async def establish_conn(SESSIONS, SERVER_CREDS, ws, data):
+    print(f"[INFO] Remote {ws.remote_address} attempted connection")
     try:
         uuid = UUID(data, version=4)
     except ValueError:
-        await websocket.close(code = 1008, reason = "Connection UUID Invalid")
+        await ws.close(code = 1008, reason = "Connection UUID Invalid")
         return 'CONN_CLOSED'
     if uuid in SESSIONS.keys():
-        await websocket.close(code = 1008, reason = "Connection UUID Already in use")
+        await ws.close(code = 1008, reason = "Connection UUID Already in use")
         return 'CONN_CLOSED'
-    SESSIONS[uuid] = [websocket, None, None] # ws, public_key, user_uuid
+    SESSIONS[uuid] = [ws, None, None] # ws, public_key, user_uuid
 
-    print(f"[INFO] {uuid} CONN_INIT: {websocket.remote_address}")
+    print(f"[INFO] {uuid} CONN_INIT: {ws.remote_address}")
     print(f"[INFO] SENDING PUBLIC KEY to {uuid}")
 
     # Encrypt Connection
-    await websocket.send(pickle.dumps({'type':'CONN_ENCRYPT_S','data':SERVER_CREDS['server_epbkey']}))
-    #try:
-    client_epbkey = pickle.loads(await websocket.recv())
+    await ws.send(pickle.dumps({'type':'CONN_ENCRYPT_S','data':SERVER_CREDS['server_epbkey']}))
     try:
-        client_epbkey = s.load_pem_public_key(client_epbkey['data'])
-    except Exception as e:
-        print(f"[INFO] CLIENT un-established {websocket.remote_address} DISCONNECTED due to INVALID_PACKET")
-        await websocket.close(code = 1008, reason = "Invalid packet structure")
+        client_epbkey = pickle.loads(await ws.recv())
+        try:
+            client_epbkey = s.load_pem_public_key(client_epbkey['data'])
+        except Exception as e:
+            print(f"[INFO] CLIENT un-established {ws.remote_address} DISCONNECTED due to INVALID_PACKET")
+            await ws.close(code = 1008, reason = "Invalid packet structure")
+            return 'CONN_CLOSED'
+        
+        SESSIONS[uuid][1] = client_epbkey
+        print(f"[INFO] Received public key for {ws.remote_address}")
+        del client_epbkey
+        return en.encrypt_packet(
+            {'type':'STATUS', 'data':{'sig':'CONN_OK'}},
+            SESSIONS[uuid][1],
+            )
+    # If client sends bullshit instead of its PEM serialized ephemeral public key
+    except Exception as err2:
+        print(f"[INFO] CLIENT {uuid} {ws.remote_address} DISCONNECTED due to INVALID_CONN_KEY:\n\t",err2)
+        await ws.close(code = 1003, reason = "Connection Public Key in invalid format")
+        del SESSIONS[uuid]
         return 'CONN_CLOSED'
     
-    SESSIONS[uuid][1] = client_epbkey
-    print(f"[INFO] Received public key for {websocket.remote_address}")
-    del client_epbkey
-    return en.encrypt_packet(
-        {'type':'STATUS', 'data':{'sig':'CONN_OK'}},
-        SESSIONS[uuid][1],
-        )
-    # If client sends bullshit instead of its PEM serialized ephemeral public key
-    """except Exception as err2:
-        print(f"[INFO] CLIENT {uuid} {websocket.remote_address} DISCONNECTED due to INVALID_CONN_KEY:\n\t",err2)
-        await websocket.close(code = 1003, reason = "Connection Public Key in invalid format")
-        del SESSIONS[uuid]
-        return 'CONN_CLOSED'"""
-    
-async def send_packet(SESSIONS, ws, de_packet):
+async def get_resp_packet(SESSIONS, ws, de_packet):
     uuid = await identify_client(ws, SESSIONS)
     en_packet = en.encrypt_packet(de_packet, SESSIONS[uuid][1])
     return en_packet
@@ -74,19 +74,19 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
         dob = datetime.strpdata['dob']
         password = data['password']
     except KeyError as ero:
-        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_MISSING_CREDS','desc':ero}})
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_MISSING_CREDS','desc':ero}})
     if len(user) > 32:
-        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_USERNAME_ABOVE_LIMIT'}})
-    if db.check_if_exists(user, 'username'):
-        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_USERNAME_ALREADY_EXISTS'}})
-    if len(email) > 256:
-        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_EMAIL_ABOVE_LIMIT'}})
-    if len(fullname) > 256:
-        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_NAME_ABOVE_LIMIT'}})
-    if len(dob) > 10:
-        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_DOB_INVALID'}})
-    if len(password) > 384:
-        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_PASSWORD_ABOVE_LIMIT'}})
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_USERNAME_ABOVE_LIMIT'}})
+    elif db.check_if_exists(user, 'username'):
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_USERNAME_ALREADY_EXISTS'}})
+    elif len(email) > 256:
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_EMAIL_ABOVE_LIMIT'}})
+    elif len(fullname) > 256:
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_NAME_ABOVE_LIMIT'}})
+    elif len(dob) > 10:
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_DOB_INVALID'}})
+    elif len(password) > 384:
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_PASSWORD_ABOVE_LIMIT'}})
     resp_captcha = await captcha(SESSIONS, SERVER_CREDS, ws, data)
     if resp_captcha == True:
         print(f"[INFO] CLIENT {uuid} ATTEMPTED SIGNUP WITH username {user}")
@@ -94,22 +94,64 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
         try:
             db.Account.create(user, fullname, dob, email, salted_pwd)
         except Exception as errr:
-            return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_ERR','desc':errr}})
+            return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_ERR','desc':errr}})
         else:
-            return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_OK'}})
+            return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_OK'}})
     elif resp_captcha == False:
-        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CAPTCHA_WRONG'}})
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CAPTCHA_WRONG'}})
 
 async def login(SESSIONS, SERVER_CREDS, ws, data):
-    identifier = data['id']
-    password = data['password']
-    flag = db.Account.check_pwd(password, identifier)
-    if flag == True:
-        # token auth
-    elif flag == False:
-        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_INCORRECT_PASSWORD'}})
-    elif flag == 'ACCOUNT_DNE':
-        return await send_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_ACCOUNT_NOT_FOUND'}})
+    try:
+        identifier = data['id']
+        password = data['password']
+        dont_ask_again = data['save']
+    except KeyError as ero:
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_MISSING_CREDS','desc':ero}})
+    resp_captcha = await captcha(SESSIONS, SERVER_CREDS, ws, data)
+    if resp_captcha == True:
+        flag, uuid = db.Account.check_pwd(password, identifier)
+        if flag == True:
+            if dont_ask_again == True:
+                secret, access_token = en.gen_token(uuid, 30)
+            else:
+                secret, access_token = en.gen_token(uuid, 1)
+            db.Account.set_token(uuid, secret)
+            en_packet = await get_resp_packet(SESSIONS, ws, {'type':'TOKEN_GEN','data':{'token':access_token}})
+            pubkey_resp = await get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid)
+            if pubkey_resp == 'CONN_CLOSED':
+                return 'CONN_CLOSED'
+            elif pubkey_resp == 'CHAT_PUBKEY_OK':
+                return en_packet
+        elif flag == False:
+            return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_INCORRECT_PASSWORD'}})
+        elif flag == 'ACCOUNT_DNE':
+            return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_ACCOUNT_NOT_FOUND'}})
+    elif resp_captcha == False:
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CAPTCHA_WRONG'}})
+
+async def auth():
+
+async def get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid):
+    flag = db.check_pubkey(uuid)
+    if flag == False:
+        await ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CHAT_PUBKEY_MISSING'}}))
+        while True:
+            de_pubkey = pickle.loads(en.decrypt_packet(await ws.recv(), SERVER_CREDS['server_eprkey']))
+            if de_pubkey['type'] == 'CHAT_ENCRYPT_C':
+                try:
+                    s.load_pem_public_key(de_pubkey['data']['chat_pubkey'])
+                except Exception as ear:
+                    await ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CHAT_PUBKEY_INVALID'}}))
+                else:
+                    db.Account.set_pubkey(uuid, de_pubkey['data']['chat_pubkey'])
+                    await ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CHAT_PUBKEY_OK'}}))
+                    return 'CHAT_PUBKEY_OK'
+            else:
+                print(f"[INFO] CLIENT un-established {ws.remote_address} DISCONNECTED due to INVALID_PACKET")
+                await ws.close(code = 1008, reason = "Invalid packet structure")
+                return 'CONN_CLOSED'
+    elif flag == True:
+        return 'CHAT_PUBKEY_OK'
 
 async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     uuid = await identify_client(ws, SESSIONS)
@@ -133,7 +175,7 @@ upacket_map = {
 }
 packet_map = {
     'SIGNUP':signup,
-    'LOGIN':3,
+    'LOGIN':login,
     'CHAT_ENCRYPT_C':4,
     'AUTHENTICATE':6,
     'CREATE_ROOM':5,
