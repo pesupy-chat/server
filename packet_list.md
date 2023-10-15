@@ -15,9 +15,11 @@
 |c|client-chatpubkey|{'type':'CHAT_ENCRYPT_C', 'data':{'chat_pubkey':pem}}|
 |s|session-token-gen|{'type':'GEN_TOKEN', 'data':{'token':token}}|
 |c|session-token-auth|{'type':'AUTH_TOKEN', 'data':{'user','token':token}}|
-|c|room-create|{'type':'CREATE_ROOM', 'data':{'people':[user1,user2,...]}}|
+|c|room-create|{'type':'CREATE_ROOM', 'data':{'people':[creator_username,user2,...]}}|
 |c|msg-packet|{'type':'CHAT_ACTION', 'data':{'format':format, 'msg':message}}|
 |c|room-alter|{'type':'ALTER_ROOM', 'data':{'action':action, 'actiondata':actiondata}}|
+|c|room-sync-request|{'type':'SYNC_ROOM_REQ', 'data':{'room':roomuid, 'count':no_of_messages, 'from':from_msguid}}|
+|s|room-sync-data|{'type':'SYNC_ROOM_DATA', 'data':}
 |c|read-receipt (implement if make GUI)||
 |c|logout||
 

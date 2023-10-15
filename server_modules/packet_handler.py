@@ -151,6 +151,7 @@ async def auth(SESSIONS, SERVER_CREDS, ws, data):
     flag = en.validate_token(key, token, con_uuid)
     if flag == 'TOKEN_OK':
         SESSIONS[con_uuid][2] = user_uuid
+        # tasks to run on login, change below line to send packet directly and then send other packets
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_OK'}})
     elif flag == 'TOKEN_EXPIRED':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'TOKEN_EXPIRED'}})
@@ -159,7 +160,7 @@ async def auth(SESSIONS, SERVER_CREDS, ws, data):
 
 async def get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid):
     flag = db.check_pubkey(uuid)
-    if flag == False:
+    if not flag:
         await ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CHAT_PUBKEY_MISSING'}}))
         while True:
             de_pubkey = en.decrypt_packet(await ws.recv(), SERVER_CREDS['server_eprkey'])
@@ -177,8 +178,24 @@ async def get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid):
                 print(f"[INFO] CLIENT un-established {ws.remote_address} DISCONNECTED due to INVALID_PACKET")
                 await ws.close(code = 1008, reason = "Invalid packet structure")
                 return 'CONN_CLOSED'
-    elif flag == True:
+    elif flag:
         return 'CHAT_PUBKEY_OK'
+    
+async def create_room(SESSIONS, SERVER_CREDS, ws, data):
+    con_uuid = await identify_client(ws, SESSIONS)
+    if len(data['people']) < 2:
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_INSUFFICIENT_PARTICIPANTS'}})
+    elif data['people'][0] != SESSIONS[con_uuid][2]:
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_INVALID_SYNTAX'}})
+    elif data['people'][0] == SESSIONS[con_uuid][2]:
+        flag = db.Room.create(data['people'])
+    if flag == 'NOT_IMPLEMENTED':
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_NOT_IMPLEMENTED'}})
+    elif flag == 'MKROOM_ERROR':
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_ERROR'}})
+    elif flag[0] == 'MKROOM_OK':
+        return await get_resp_packet(SESSIONS, ws, {'type':'ROOM_INFO','data':{'room_type':flag[1], 'room_uuid':flag[2], 'members':flag[3]}})
+
 
 async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     uuid = await identify_client(ws, SESSIONS)
@@ -203,8 +220,6 @@ upacket_map = {
 packet_map = {
     'SIGNUP':signup,
     'LOGIN':login,
-    'CHAT_ENCRYPT_C':4,
-    'AUTHENTICATE':6,
     'CREATE_ROOM':5,
     'CHAT_ACTION':7,
     'ALTER_ROOM':8,

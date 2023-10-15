@@ -10,6 +10,7 @@ import i18n
 from yaml import safe_load as loadyaml
 from yaml import dump as dumpyaml
 
+
 def execute_firstrun():
     firstrun.main()
     print(i18n.firstrun.security)
@@ -20,10 +21,11 @@ def execute_firstrun():
     print(i18n.firstrun.exit)
     sys.exit()
 
+
 def check_missing_config(f, yaml, config):
     try:
         if yaml[config] is None:
-            print(i18n.firstrun.prompt1+config)
+            print(i18n.firstrun.prompt1 + config)
             if config == 'working_directory':
                 print(i18n.firstrun.prompt2)
                 while True:
@@ -41,8 +43,9 @@ def check_missing_config(f, yaml, config):
             else:
                 fill_missing_config(f, yaml, config)
     except KeyError:
-        print(i18n.firstrun.prompt1+config)
+        print(i18n.firstrun.prompt1 + config)
         fill_missing_config(f, yaml, config)
+
 
 def fill_missing_config(f, yaml, config):
     print(i18n.firstrun.fix_missing, config)
@@ -52,13 +55,15 @@ def fill_missing_config(f, yaml, config):
     f.seek(0)
     f.write(dumpyaml(yaml))
 
+
 async def interpret(packet, websocket):
     global SESSIONS
     try:
         sender = await p.identify_client(websocket, SESSIONS)
     except:
         pass
-    return await p.handle(SESSIONS, SERVER_CREDS, packet, websocket) # return handler(sender, type, data)
+    return await p.handle(SESSIONS, SERVER_CREDS, packet, websocket)  # return handler(sender, type, data)
+
 
 async def catch(websocket):
     # Handle incoming packets
@@ -72,17 +77,19 @@ async def catch(websocket):
     # Handle disconnection due to any exception
     except Exception as err3:
         client = await p.identify_client(websocket, SESSIONS)
-        print(f"[INFO] CLIENT {client} DISCONNECTED due to\n\t",err3)
+        print(f"[INFO] CLIENT {client} DISCONNECTED due to\n\t", err3)
         del SESSIONS[client]
         return None
 
+
 async def main(host, port):
     async with websockets.serve(
-        catch, host=host, port=port, 
-        ping_interval=30, ping_timeout=None, close_timeout=None,
-        max_size=10485760 
+            catch, host=host, port=port,
+            ping_interval=30, ping_timeout=None, close_timeout=None,
+            max_size=10485760
     ):
         await asyncio.Future()  # run forever
+
 
 if __name__ == "__main__":
     SESSIONS = {}
@@ -90,7 +97,7 @@ if __name__ == "__main__":
 
     try:
         rootdir = os.path.dirname(os.path.abspath(__file__))
-        print(i18n.log.tags.info+i18n.log.server_start.format(rootdir))
+        print(i18n.log.tags.info + i18n.log.server_start.format(rootdir))
         f = open(f'{rootdir}/config.yml', 'r+')
         yaml = loadyaml(f.read())
         if not yaml:
@@ -101,7 +108,7 @@ if __name__ == "__main__":
         check_missing_config(f, yaml, 'working_directory')
         check_missing_config(f, yaml, 'listen_address')
         check_missing_config(f, yaml, 'listen_port')
-        if os.path.exists(f"{yaml['working_directory']}/creds/db") == False:
+        if not os.path.exists(f"{yaml['working_directory']}/creds/db"):
             raise TypeError("DB_CREDS_NOT_FOUND")
         f.close()
 
@@ -118,7 +125,7 @@ if __name__ == "__main__":
     try:
         db.decrypt_creds(en.fermat_gen(workingdir), workingdir)
     except Exception as w:
-        print("Error while decrypting database credentials. Check your password\n",w)
+        print("Error while decrypting database credentials. Check your password\n", w)
         print(i18n.firstrun.exit)
         sys.exit()
 
@@ -128,11 +135,21 @@ if __name__ == "__main__":
 
     print("[INFO] SERVER ONLINE!")
     try:
-        asyncio.run(main(host,port))
+        asyncio.run(main(host, port))
     except KeyboardInterrupt:
         print('\n[INFO] Goodbye!')
         db.close()
         sys.exit()
+
+
+
+
+
+
+
+
+
+
 
 
 
