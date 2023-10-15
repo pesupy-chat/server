@@ -129,7 +129,20 @@ async def login(SESSIONS, SERVER_CREDS, ws, data):
     elif resp_captcha == False:
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CAPTCHA_WRONG'}})
 
-async def auth():
+async def auth(SESSIONS, SERVER_CREDS, ws, data):
+    user = data['data']['user']
+    token = data['data']['token']
+    con_uuid = await identify_client(ws, SESSIONS)
+    user_uuid = db.get_uuid(user)
+    key = db.Account.get_token_key(user_uuid)
+    flag = en.validate_token(key, token, con_uuid)
+    if flag == 'TOKEN_OK':
+        SESSIONS[con_uuid][2] = user_uuid
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_OK'}})
+    elif flag == 'TOKEN_EXPIRED':
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'TOKEN_EXPIRED'}})
+    elif flag == 'TOKEN_INVALID':
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'TOKEN_INVALID'}})
 
 async def get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid):
     flag = db.check_pubkey(uuid)

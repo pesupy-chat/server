@@ -66,10 +66,17 @@ def check_pubkey(uuid):
     elif len(data) == 1:
         return True
 
-def get_uuid(user):
-    db.cur.execute("SELECT UUID FROM chatapp_accounts.users WHERE USERNAME = %s", (user,))
-    data = db.cur.fetchall()
-    return data[0][0]
+def get_uuid(identifier):
+    try:
+        if '@' not in identifier:
+            db.cur.execute("SELECT UUID FROM chatapp_accounts.users WHERE USERNAME=%s", (identifier,))
+            uuid = db.cur.fetchall()[0][0]
+        elif '@' in identifier:
+            db.cur.execute("SELECT UUID FROM chatapp_accounts.users WHERE EMAIL=%s", (identifier,))
+            uuid = db.cur.fetchall()[0][0]
+    except IndexError:
+        return 'ACCOUNT_DNE'
+    return uuid
 
 def close():
     if db.con is not None:
@@ -118,3 +125,6 @@ class Account(db):
     def set_token(uuid, secret):
         db.cur.execute("INSERT INTO chatapp_accounts.auth(UUID, TOKEN_SECRET) VALUES(%s, %s)", (uuid, secret))
         db.con.commit()
+    def get_token_key(uuid):
+        db.cur.execute("SELECT TOKEN_SECRET FROM chatapp_accounts.auth WHERE UUID = %s", (uuid,))
+        return db.cur.fetchall()[0][0]

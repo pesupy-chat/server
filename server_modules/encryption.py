@@ -190,8 +190,20 @@ def gen_token(user, validity):
         "iat": datetime.datetime.utcnow(),
         "exp": datetime.datetime.utcnow() + datetime.timedelta(days = validity)
     }
-    access_token = jwt.encode(payload, secret, algorithm="RS256")
+    access_token = jwt.encode(payload, secret, algorithm="HS256")
     return (secret, access_token)
 
-def validate_token(user, token):
-    
+def validate_token(key, token, user):
+    try:
+        decoded_token = jwt.decode(token, key, algorithms=["HS256"])
+    except:
+        return 'TOKEN_INVALID'
+    timenow = datetime.datetime.utcnow()
+    if decoded_token['sub'] == user and timenow < decoded_token['exp']:
+        return 'TOKEN_OK'
+    elif decoded_token['sub'] == user and timenow > decoded_token['exp']:
+        return 'TOKEN_EXPIRED'
+    elif decoded_token['sub'] != user:
+        return 'TOKEN_INVALID'
+    else:
+        return 'TOKEN_INVALID'
