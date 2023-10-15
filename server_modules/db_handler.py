@@ -51,15 +51,16 @@ def initialize_schemas():
 def check_if_exists(value, field):
     col = fields_to_check[field]['attribute']
     table = fields_to_check[field]['table']
-    db.cur.execute(f"select {col} from {table} where {col} = {value}")
+    db.cur.execute(f"select {col} from {table} where {col} = '{value}'")
     data = db.cur.fetchall() 
-    if data[0][0] == value:
-        return True
-    else:
+    try:
+        if data[0][0] == value:
+            return True
+    except IndexError:
         return False
 
 def check_pubkey(uuid):
-    db.cur.execute(f"SELECT PUBKEY FROM chatapp_accounts.pubkeys WHERE UUID = {uuid}")
+    db.cur.execute(f"SELECT PUBKEY FROM chatapp_accounts.pubkeys WHERE UUID = '{uuid}'")
     data = db.cur.fetchall()
     if len(data) == 0:
         return False
@@ -123,7 +124,7 @@ class Account(db):
         return (flag, uuid)
 
     def set_token(uuid, secret):
-        db.cur.execute("INSERT INTO chatapp_accounts.auth(UUID, TOKEN_SECRET) VALUES(%s, %s)", (uuid, secret))
+        db.cur.execute("UPDATE chatapp_accounts.auth SET TOKEN_SECRET = %s WHERE UUID = %s", (secret, uuid))
         db.con.commit()
     def get_token_key(uuid):
         db.cur.execute("SELECT TOKEN_SECRET FROM chatapp_accounts.auth WHERE UUID = %s", (uuid,))

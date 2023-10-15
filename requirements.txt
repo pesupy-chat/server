@@ -8,4 +8,4 @@ pycparser
 PyYAML
 uuid
 websockets
-jwt
+PyJWT

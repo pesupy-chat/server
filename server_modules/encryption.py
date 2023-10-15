@@ -164,15 +164,17 @@ def salt_pwd(password):
 
 def db_check_pwd(pwd, saltedpwd):
     salted_pwd = pickle.loads(saltedpwd)
+    print(f"[DEBUG] {salted_pwd}")
     salt, key = salted_pwd['salt'], salted_pwd['key']
+    password = pwd.encode()
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
         salt=salt,
-        iterations=100000,
+        iterations=600000,
         backend=default_backend()
     )
-    provided_key = urlsafe_b64encode(kdf.derive(pwd))
+    provided_key = urlsafe_b64encode(kdf.derive(password))
 
     # Check if the provided key matches the stored key
     if provided_key == key:

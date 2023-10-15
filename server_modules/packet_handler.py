@@ -19,6 +19,18 @@ async def disconnect(ws, code, reason):
 
 #async def get_packet(ws, type):
 #    # packet validator
+def parse_date(date_string):
+    date_formats = ["%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%Y/%m/%d"]
+
+    for date_format in date_formats:
+        try:
+            date_obj = datetime.datetime.strptime(date_string, date_format)
+        except ValueError:
+            pass
+        else:
+            return date_obj
+    else:
+        return 'PARSE_ERR'
 
 async def establish_conn(SESSIONS, SERVER_CREDS, ws, data):
     print(f"[INFO] Remote {ws.remote_address} attempted connection")
@@ -32,7 +44,7 @@ async def establish_conn(SESSIONS, SERVER_CREDS, ws, data):
         return 'CONN_CLOSED'
     SESSIONS[uuid] = [ws, None, None] # ws, public_key, user_uuid
 
-    print(f"[INFO] {uuid} CONN_INIT: {ws.remote_address}")
+    print(f"[INFO] Remote {ws.remote_address} initiated connection with UUID: {uuid}")
     print(f"[INFO] SENDING PUBLIC KEY to {uuid}")
 
     # Encrypt Connection
@@ -71,7 +83,7 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
         user = data['user']
         email = data['email']
         fullname = data['fullname']
-        dob = datetime.strpdata['dob']
+        dob = parse_date(data['dob'])
         password = data['password']
     except KeyError as ero:
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_MISSING_CREDS','desc':ero}})
@@ -83,7 +95,7 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_EMAIL_ABOVE_LIMIT'}})
     elif len(fullname) > 256:
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_NAME_ABOVE_LIMIT'}})
-    elif len(dob) > 10:
+    elif dob == 'PARSE_ERR':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_DOB_INVALID'}})
     elif len(password) > 384:
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_PASSWORD_ABOVE_LIMIT'}})
@@ -130,6 +142,7 @@ async def login(SESSIONS, SERVER_CREDS, ws, data):
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CAPTCHA_WRONG'}})
 
 async def auth(SESSIONS, SERVER_CREDS, ws, data):
+    # REMINDER TO HANDLE LOGIN FROM TWO DEVICES
     user = data['data']['user']
     token = data['data']['token']
     con_uuid = await identify_client(ws, SESSIONS)
@@ -149,7 +162,8 @@ async def get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid):
     if flag == False:
         await ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CHAT_PUBKEY_MISSING'}}))
         while True:
-            de_pubkey = pickle.loads(en.decrypt_packet(await ws.recv(), SERVER_CREDS['server_eprkey']))
+            de_pubkey = en.decrypt_packet(await ws.recv(), SERVER_CREDS['server_eprkey'])
+            print(de_pubkey)
             if de_pubkey['type'] == 'CHAT_ENCRYPT_C':
                 try:
                     s.load_pem_public_key(de_pubkey['data']['chat_pubkey'])
