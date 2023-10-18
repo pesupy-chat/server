@@ -88,12 +88,17 @@ def ser_key_pem(key, type: str):
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
-#    elif type == 'private':
-#        return key.private_bytes(
-#            encoding=serialization.Encoding.PEM,
-#            format=serialization.PrivateFormat.PKCS8,
-#            encryption_algorithm=serialization.NoEncryption()
-#        )
+    elif type == 'private':
+        return key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+def deser_pem(key, type):
+    if type == 'public':
+        return serialization.load_pem_public_key(key)
+    elif type == 'private':
+        return serialization.load_pem_private_key(key, password=None)
 
 def encrypt_packet(data, pubkey):
     data = pickle.dumps(data)

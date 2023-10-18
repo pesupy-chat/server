@@ -77,6 +77,14 @@ async def get_resp_packet(SESSIONS, ws, de_packet):
     en_packet = en.encrypt_packet(de_packet, SESSIONS[uuid][1])
     return en_packet
 
+async def send_user_packet(SESSIONS, user_uuid, de_packet):
+    try:
+        con_uuid = list(SESSIONS.keys())[[i[2] for i in list(SESSIONS.values())].index(user_uuid)]
+        ws = SESSIONS[con_uuid][0]
+        ws.send(en.encrypt_packet(de_packet, SESSIONS[con_uuid[1]]))
+    except IndexError:
+        db.queue_packet(user_uuid,en_packet)
+
 async def signup(SESSIONS, SERVER_CREDS, ws, data):
     uuid = list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(ws)]
     try:
@@ -194,7 +202,8 @@ async def create_room(SESSIONS, SERVER_CREDS, ws, data):
     elif flag == 'MKROOM_ERROR':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_ERROR'}})
     elif flag[0] == 'MKROOM_OK':
-        return await get_resp_packet(SESSIONS, ws, {'type':'ROOM_INFO','data':{'room_type':flag[1], 'room_uuid':flag[2], 'members':flag[3]}})
+
+        return await get_resp_packet(SESSIONS, ws, {'type':'ROOM_INFO','data':{'room_type':flag[1], 'room_uuid':flag[2], 'members':flag[3], 'dne':flag[4]}})
 
 
 async def captcha(SESSIONS, SERVER_CREDS, ws, data):

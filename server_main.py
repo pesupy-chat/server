@@ -123,15 +123,46 @@ if __name__ == "__main__":
     host, port = yaml['listen_address'], yaml['listen_port']
 
     try:
-        db.decrypt_creds(en.fermat_gen(workingdir), workingdir)
+        fkey = en.fermat_gen(workingdir)
+        db.decrypt_creds(fkey, workingdir)
     except Exception as w:
         print("Error while decrypting database credentials. Check your password\n", w)
         print(i18n.firstrun.exit)
         sys.exit()
 
+    try:
+        with open(f'{workingdir}/creds/queue_publickey', 'rb') as f:
+            pem_pubkey = f.read()
+            pubkey = en.deser_pem(pem_pubkey, 'public')
+    except FileNotFoundError:
+        print("Could not find packet queue keypair. Server will now generate it again.")
+        try:
+            with open(f'{workingdir}/creds/queue_privatekey', 'rb') as f:
+                en_pem_prkey = f.read()
+            pem_prkey = fkey.decrypt(en_pem_prkey)
+            prkey = en.deser_pem(pem_prkey, 'private')
+            # DERIVE PUBKEY FROM HERE
+            with open(f'{workingdir}/creds/queue_publickey', 'wb') as f:
+                f.write(pem_pubkey)
+        except FileNotFoundError:
+            print("Could not find packet queue keypair. Server will now generate it again.")
+            ch = input("This will cause previously unsent packets in the queue to be lost. Continue? (y/n) > ")
+            if ch.lower() == 'y':
+                db.clear_queue()
+                firstrun.save_queue_keypair()
+            if ch.lower() == 'n':
+                print("Key ah kaanume enna panradhu ippo?")
+    else:
+        with open(f'{workingdir}/creds/queue_privatekey', 'rb') as f:
+            en_pem_prkey = f.read()
+            pem_prkey = fkey.decrypt(en_pem_prkey)
+            prkey = en.deser_pem(pem_prkey, 'private')
+
     server_eprkey, server_epbkey = en.create_conn_key_pair()
     SERVER_CREDS['server_eprkey'] = server_eprkey
     SERVER_CREDS['server_epbkey'] = en.ser_key_pem(server_epbkey, 'public')
+    SERVER_CREDS['queue_privkey'] = prkey
+    SERVER_CREDS['queue_pubkey'] = pubkey
 
     print("[INFO] SERVER ONLINE!")
     try:

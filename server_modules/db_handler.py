@@ -44,14 +44,18 @@ CREATE TABLE IF NOT EXISTS rooms (
 CREATE DATABASE IF NOT EXISTS chatapp_internal;
 USE chatapp_internal;
 CREATE TABLE IF NOT EXISTS settings (PARAM varchar(64) NOT NULL, VALUE varchar(256) NOT NULL);
-CREATE TABLE IF NOT EXISTS `message_queue` (`recipientUUID` char(36) NOT NULL, `packet` mediumblob NOT NULL);"""
+CREATE TABLE IF NOT EXISTS `message_queue` (
+    `timestamp` timestamp PRIMARY KEY DEFAULT CURRENT_TIMESTAMP, 
+    `recipientUUID` char(36) NOT NULL, 
+    `packet` mediumblob NOT NULL
+);"""
 
 createroom = """CREATE TABLE chatapp_chats.%s (
-  `messageID` int(11) NOT NULL AUTO_INCREMENT,
+  `messageID` int NOT NULL AUTO_INCREMENT,
   `sender` char(36) NOT NULL,
-  `timestamp` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `message` mediumblob NOT NULL,
-  `type` int(11) NOT NULL DEFAULT 0,
+  `type` int NOT NULL DEFAULT 0,
   PRIMARY KEY (`messageID`)
 );"""
 
@@ -116,6 +120,14 @@ def get_uuid(identifier):
     except IndexError:
         return 'ACCOUNT_DNE'
     return uuid
+
+def queue_packet(user_uuid, en_packet: bytes):
+    db.cur.execute("INSERT INTO chatapp_internal.message_queue(recipientUUID, packet) VALUES (%s, %s)", (user_uuid, en_packet))
+    db.con.commit()
+
+def clear_queue():
+    db.cur.execute("DELETE FROM chatapp_internal.message_queue WHERE packet IS NOT NULL")
+    db.con.commit()
 
 def close():
     if db.con is not None:
@@ -182,13 +194,13 @@ class Room(db):
             if flag == True:
                 members_db.append(get_uuid(user))
             elif flag == False:
-                ## SAVEPOINT
-
+                members_dne.append(user)
+        members_insert = pickle.dumps(members_db)
         try:
             db.cur.execute(queries['create_room'], (chat_table,))
             query = "INSERT INTO chatapp_chats.rooms(CREATOR_UUID, ROOM_TYPE, MEMBERS, CHAT_TABLE) VALUES (%s, %s, %s, %s)"
-            db.cur.execute(query, (members[0], room_type, members_db, chat_table))
+            db.cur.execute(query, (members[0], room_type, members_insert, chat_table))
             db.con.commit()
-            return ['MKROOM_OK', room_type, chat_table, <members variable>]
+            return ['MKROOM_OK', room_type, chat_table, members_db, members_dne]
         except:
             return 'MKROOM_ERROR'
