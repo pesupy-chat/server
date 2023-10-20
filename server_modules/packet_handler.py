@@ -82,8 +82,8 @@ async def send_user_packet(SESSIONS, user_uuid, de_packet):
         con_uuid = list(SESSIONS.keys())[[i[2] for i in list(SESSIONS.values())].index(user_uuid)]
         ws = SESSIONS[con_uuid][0]
         ws.send(en.encrypt_packet(de_packet, SESSIONS[con_uuid[1]]))
-    except IndexError:
-        db.queue_packet(user_uuid,en_packet)
+    except ValueError:
+        db.queue_packet(user_uuid, de_packet)
 
 async def signup(SESSIONS, SERVER_CREDS, ws, data):
     uuid = list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(ws)]
@@ -159,8 +159,19 @@ async def auth(SESSIONS, SERVER_CREDS, ws, data):
     flag = en.validate_token(key, token, con_uuid)
     if flag == 'TOKEN_OK':
         SESSIONS[con_uuid][2] = user_uuid
-        # tasks to run on login, change below line to send packet directly and then send other packets
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_OK'}})
+        # tasks to run on login
+        ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_OK'}}))
+        print("[INFO] User", user_uuid, "logged in from", ws.remote_address)
+        packet_queue = db.flush_queue(user_uuid)
+        for i in packet_queue:
+            de_packet = en.decrypt_packet(i[0], SERVER_CREDS['queue_privkey'])
+            if de_packet['type'] == 'decrypt_error':
+                continue
+            else:
+                ws.send(await get_resp_packet(SESSIONS, ws, de_packet))
+        db.clear_queue(user=user_uuid)
+        print("[INFO] Flushed queue for user", user_uuid)
+        return await get_resp_packet(SESSIONS, ws, {'type':'QUEUE_END'})
     elif flag == 'TOKEN_EXPIRED':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'TOKEN_EXPIRED'}})
     elif flag == 'TOKEN_INVALID':
@@ -202,9 +213,11 @@ async def create_room(SESSIONS, SERVER_CREDS, ws, data):
     elif flag == 'MKROOM_ERROR':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_ERROR'}})
     elif flag[0] == 'MKROOM_OK':
-
+        ##
         return await get_resp_packet(SESSIONS, ws, {'type':'ROOM_INFO','data':{'room_type':flag[1], 'room_uuid':flag[2], 'members':flag[3], 'dne':flag[4]}})
 
+async def chat_action(SESSIONS, SERVER_CREDS, ws, data):
+    
 
 async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     uuid = await identify_client(ws, SESSIONS)
@@ -229,10 +242,11 @@ upacket_map = {
 packet_map = {
     'SIGNUP':signup,
     'LOGIN':login,
-    'CREATE_ROOM':5,
+    'AUTH_TOKEN':auth,
+    'CREATE_ROOM':create_room,
     'CHAT_ACTION':7,
     'ALTER_ROOM':8,
-    'LOGOUT':9
+    'LOGOUT':logout
 }
 
 async def handle(SESSIONS, SERVER_CREDS, packet, ws):

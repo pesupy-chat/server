@@ -56,21 +56,12 @@ def fill_missing_config(f, yaml, config):
     f.write(dumpyaml(yaml))
 
 
-async def interpret(packet, websocket):
-    global SESSIONS
-    try:
-        sender = await p.identify_client(websocket, SESSIONS)
-    except:
-        pass
-    return await p.handle(SESSIONS, SERVER_CREDS, packet, websocket)  # return handler(sender, type, data)
-
-
 async def catch(websocket):
     # Handle incoming packets
     try:
         while True:
-            result = await interpret(await websocket.recv(), websocket)
-            if result == 'CONN_CLOSED':
+            result = await p.handle(SESSIONS, SERVER_CREDS, await websocket.recv(), websocket)
+            if result in ('CONN_CLOSED', 'USER_PACKET'):
                 pass
             else:
                 await websocket.send(result)
@@ -141,14 +132,15 @@ if __name__ == "__main__":
                 en_pem_prkey = f.read()
             pem_prkey = fkey.decrypt(en_pem_prkey)
             prkey = en.deser_pem(pem_prkey, 'private')
-            # DERIVE PUBKEY FROM HERE
+            pubkey = prkey.public_key()
+
             with open(f'{workingdir}/creds/queue_publickey', 'wb') as f:
                 f.write(pem_pubkey)
         except FileNotFoundError:
             print("Could not find packet queue keypair. Server will now generate it again.")
             ch = input("This will cause previously unsent packets in the queue to be lost. Continue? (y/n) > ")
             if ch.lower() == 'y':
-                db.clear_queue()
+                db.clear_queue(user=None)
                 firstrun.save_queue_keypair()
             if ch.lower() == 'n':
                 print("Key ah kaanume enna panradhu ippo?")

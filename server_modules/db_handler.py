@@ -121,13 +121,22 @@ def get_uuid(identifier):
         return 'ACCOUNT_DNE'
     return uuid
 
-def queue_packet(user_uuid, en_packet: bytes):
+def queue_packet(user_uuid, de_packet, SERVER_CREDS):
+    en_packet = en.encrypt_packet(de_packet, SERVER_CREDS['queue_pubkey'])
     db.cur.execute("INSERT INTO chatapp_internal.message_queue(recipientUUID, packet) VALUES (%s, %s)", (user_uuid, en_packet))
     db.con.commit()
 
-def clear_queue():
-    db.cur.execute("DELETE FROM chatapp_internal.message_queue WHERE packet IS NOT NULL")
-    db.con.commit()
+def clear_queue(user: str | None):
+    if user:
+        db.cur.execute("DELETE FROM chatapp_internal.message_queue WHERE recipientUUID = %s", (user,))
+        db.con.commit()
+    elif not user:
+        db.cur.execute("DELETE FROM chatapp_internal.message_queue WHERE packet IS NOT NULL")
+        db.con.commit()
+
+def flush_queue(user_uuid):
+    db.cur.execute("SELECT packet FROM chatapp_internal.message_queue WHERE recipientUUID = %s", (user_uuid,))
+    return db.cur.fetchall()
 
 def close():
     if db.con is not None:

@@ -14,7 +14,7 @@
 |c|login|{'type':'LOGIN', 'data':{'id':username/email,'password':password,'save':True or False}}|
 |c|client-chatpubkey|{'type':'CHAT_ENCRYPT_C', 'data':{'chat_pubkey':pem}}|
 |s|session-token-gen|{'type':'GEN_TOKEN', 'data':{'token':token}}|
-|c|session-token-auth|{'type':'AUTH_TOKEN', 'data':{'user','token':token}}|
+|c|session-token-auth|{'type':'AUTH_TOKEN', 'data':{'user':user,'token':token}}|
 |c|room-create|{'type':'CREATE_ROOM', 'data':{'people':[creator_username,user2,...]}}|
 |c|msg-packet|{'type':'CHAT_ACTION', 'data':{'format':format, 'msg':message}}|
 |c|room-alter|{'type':'ALTER_ROOM', 'data':{'action':action, 'actiondata':actiondata}}|
