@@ -212,10 +212,8 @@ async def create_room(SESSIONS, SERVER_CREDS, ws, data):
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_ERROR'}})
     elif flag[0] == 'MKROOM_OK':
         roomdata = {'room_type':flag[1], 'room_name':flag[2], 'room_uuid':flag[3], 'members':flag[4], 'dne':flag[5]}
-        broadcast_packet(SESSIONS, SERVER_CREDS, flag[4], {'type':'JOIN_ROOM', 'data':roomdata})
+        await broadcast_packet(SESSIONS, SERVER_CREDS, flag[4], {'type':'JOIN_ROOM', 'data':roomdata})
         return await get_resp_packet(SESSIONS, ws, {'type':'ROOM_INFO','data':roomdata})
-
-async def alter_room(SESSIONS, SERVER_CREDS, ws, data):
 
 async def broadcast_packet(SESSIONS, SERVER_CREDS, members, packet):
     for user in members:
@@ -223,15 +221,13 @@ async def broadcast_packet(SESSIONS, SERVER_CREDS, members, packet):
         # send the packet to members
 
 async def chat_action(SESSIONS, SERVER_CREDS, ws, data):
-# - user-pubkey
-# - msg-text
 # - msg-smallfile (image, audio, short videos) (upto 32MB) (not implementing now)
 # - msg-largefile (not implementing now)
-# - msg-edit
-# - msg-delete
+# BELOW CODE IS FOR TYPE 0 ONLY!
     sender = await identify_client(ws, SESSIONS)
     user = SESSIONS[sender][2]
     room = db.Room.fetch_info(data['room'])
+    # room[2] == 0
     if room == 'ROOM_DNE':
         ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'ROOM_DNE'}))
     elif room[1] == user or user in pickle.loads(room[3]):
@@ -243,16 +239,16 @@ async def chat_action(SESSIONS, SERVER_CREDS, ws, data):
         elif data['action'] == 'delete':
             re_data = {'action':'deleted', 'actiondata':data['actiondata']}
         elif data['action'] == 'pinned':
-            re_data = {'action':'edited', 'actiondata':data['actiondata']}
+            re_data = {'action':'pinned', 'actiondata':data['actiondata']}
         else:
             return 'INVALID_PACKET'
         de_packet = {'type':'CHAT_ACTION_S', 'data':re_data}
-        db.Chat.save_msg(user, data)
-        broadcast_packet(SESSIONS, SERVER_CREDS, members, de_packet)
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'SENT'}})
-
-async def logout(SESSIONS, SERVER_CREDS, ws, data):
-    
+        flag = db.Chat.save_msg(user, data)
+        if flag == 'SUCCESS':
+            await broadcast_packet(SESSIONS, SERVER_CREDS, members, de_packet)
+            return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'SENT'}})
+        elif flag == 'NOT_YOURS':
+            return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'MSG_NOT_YOURS'}})
 
 async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     uuid = await identify_client(ws, SESSIONS)
@@ -279,9 +275,7 @@ packet_map = {
     'LOGIN':login,
     'AUTH_TOKEN':auth,
     'CREATE_ROOM':create_room,
-    'CHAT_ACTION':7,
-    'ALTER_ROOM':8,
-    'LOGOUT':logout
+    'CHAT_ACTION':chat_action
 }
 
 async def handle(SESSIONS, SERVER_CREDS, packet, ws):

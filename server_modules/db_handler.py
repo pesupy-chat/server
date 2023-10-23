@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS `message_queue` (
 
 createroom = """CREATE TABLE chatapp_chats.{0} (
   `messageID` int NOT NULL AUTO_INCREMENT,
+  `messageUUID` char(36) UNIQUE NOT NULL,
   `sender` char(36) NOT NULL,
   `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `message` mediumblob NOT NULL,
@@ -199,7 +200,7 @@ class Room(db):
             return 'NOT_IMPLEMENTED'
         # room_type 1 is for group, 2 for broadcast
         chat_table = str(uuid4()).replace('-', '')
-        members_db, members_dne = [], []
+        members_db, members_dne = [creator], []
         for user in data['members']:
             flag = check_if_exists(user, 'username')
             if flag == True:
@@ -220,7 +221,7 @@ class Room(db):
             return 'MKROOM_ERROR'
     
     def fetch_info(room_uuid):
-        """[creator_uuid, room_type, members, chat_table]"""
+        """[intid, creator_uuid, room_type, members, chat_table]"""
         db.cur.execute("SELECT * FROM chatapp_chats.rooms WHERE CHAT_TABLE = %s", (room_uuid,))
         data = db.con.fetchall()
         if data == []:
@@ -234,6 +235,30 @@ class Chat(db):
         room_uuid, action, actiondata = data['room'], data['action'], data['actiondata']
         match action:
             case 'send':
-                db.cur.execute(f"INSERT INTO chatapp_chats.{room_uuid}(sender, message, type) VALUES (%s, %s, %s)", (sender, data['actiondata'], data['type']))
-                
-
+                db.cur.execute(f"INSERT INTO chatapp_chats.{room_uuid}(messageUUID, sender, message, type) VALUES (%s, %s, %s, %s)", (str(uuid4()), sender, actiondata['content'], actiondata['format']))
+                db.con.commit()
+                return 'SUCCESS'
+            case 'edit':
+                msg = data['actiondata']['msg']
+                db.cur.execute(f"SELECT sender FROM chatapp_chats.{room_uuid} WHERE messageUUID = %s", (msg,))
+                o_sender = db.cur.fetchall()[0][0]
+                if sender == o_sender:
+                    db.cur.execute(f"UPDATE chatapp_chats.{room_uuid} SET message = %s, type = %s WHERE messageUUID = %s", (actiondata['content'], actiondata['format'], actiondata['msg']))
+                    db.con.commit()
+                    return 'SUCCESS'
+                else:
+                    return 'NOT_YOURS'
+            case 'delete':
+                msg = data['actiondata']['msg']
+                db.cur.execute(f"SELECT sender FROM chatapp_chats.{room_uuid} WHERE messageUUID = %s", (msg,))
+                o_sender = db.cur.fetchall()[0][0]
+                if sender == o_sender:
+                    db.cur.execute(f"UPDATE chatapp_chats.{room_uuid} SET message = 'DELETED', type = 'sig' WHERE messageUUID = %s", (msg,))
+                    db.con.commit()
+                    return 'SUCCESS'
+                else:
+                    return 'NOT_YOURS'
+            case 'pinned':
+                db.cur.execute(f"UPDATE chatapp_chats.{room_uuid} SET pinned = true WHERE messageUUID = %s", (msg,))
+                db.con.commit()
+                return 'SUCCESS'

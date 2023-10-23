@@ -126,7 +126,7 @@ if __name__ == "__main__":
             pem_pubkey = f.read()
             pubkey = en.deser_pem(pem_pubkey, 'public')
     except FileNotFoundError:
-        print("Could not find packet queue keypair. Server will now generate it again.")
+        print("Could not find packet queue public key. Server will now generate it from the private key.")
         try:
             with open(f'{workingdir}/creds/queue_privatekey', 'rb') as f:
                 en_pem_prkey = f.read()
@@ -141,7 +141,9 @@ if __name__ == "__main__":
             ch = input("This will cause previously unsent packets in the queue to be lost. Continue? (y/n) > ")
             if ch.lower() == 'y':
                 db.clear_queue(user=None)
-                firstrun.save_queue_keypair()
+                firstrun.save_queue_keypair(fkey, workingdir)
+                print(i18n.firstrun.exit)
+                sys.exit()
             if ch.lower() == 'n':
                 print("Key ah kaanume enna panradhu ippo?")
     else:
