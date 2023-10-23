@@ -50,18 +50,20 @@ CREATE TABLE IF NOT EXISTS `message_queue` (
     `packet` mediumblob NOT NULL
 );"""
 
-createroom = """CREATE TABLE chatapp_chats.%s (
+createroom = """CREATE TABLE chatapp_chats.{0} (
   `messageID` int NOT NULL AUTO_INCREMENT,
   `sender` char(36) NOT NULL,
   `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `message` mediumblob NOT NULL,
-  `type` int NOT NULL DEFAULT 0,
+  `type` varchar(16) NOT NULL,
+  `pinned` bool NOT NULL DEFAULT false,
   PRIMARY KEY (`messageID`)
 );"""
 
 queries = {'initialize': initialize_ddl, 'create_room':createroom}
 fields_to_check = {
-    'username':{'table':'chatapp_accounts.users','attribute':'USERNAME'}
+    'username':{'table':'chatapp_accounts.users','attribute':'USERNAME'},
+    'room':{'table':'chatapp_chats.rooms', 'attribute':'CHAT_TABLE'}
     }
 class db:
     con = None
@@ -190,15 +192,15 @@ class Account(db):
         return db.cur.fetchall()[0][0]
     
 class Room(db):
-    def create(members: list):
-        if len(members) == 2:
-            room_type = 0
-        elif len(members) > 2:
+    def create(creator, data):
+        if data['room_type'] == 0 and len(data['members']) == 0 or len(data['members']) > 1:
+            return 'MKROOM_ERROR'
+        elif len(data['members']) > 1:
             return 'NOT_IMPLEMENTED'
         # room_type 1 is for group, 2 for broadcast
         chat_table = str(uuid4()).replace('-', '')
-        members_db, members_dne = []
-        for user in members[1::]:
+        members_db, members_dne = [], []
+        for user in data['members']:
             flag = check_if_exists(user, 'username')
             if flag == True:
                 members_db.append(get_uuid(user))
@@ -206,10 +208,32 @@ class Room(db):
                 members_dne.append(user)
         members_insert = pickle.dumps(members_db)
         try:
-            db.cur.execute(queries['create_room'], (chat_table,))
-            query = "INSERT INTO chatapp_chats.rooms(CREATOR_UUID, ROOM_TYPE, MEMBERS, CHAT_TABLE) VALUES (%s, %s, %s, %s)"
-            db.cur.execute(query, (members[0], room_type, members_insert, chat_table))
+            db.cur.execute(queries['create_room'].format(chat_table))
+            query = "INSERT INTO chatapp_chats.rooms(CREATOR_UUID, ROOM_TYPE, ROOM_NAME, MEMBERS, CHAT_TABLE) VALUES (%s, %s, %s, %s, %s)"
+            db.cur.execute(query, (data['members'][0], data['room-type'], data['room-name'], members_insert, chat_table))
             db.con.commit()
-            return ['MKROOM_OK', room_type, chat_table, members_db, members_dne]
+            match data['room-type']:
+                case 0:
+                    return ['MKROOM_OK', data['room-type'], data['room-name'], chat_table, members_db, members_dne]
+            
         except:
             return 'MKROOM_ERROR'
+    
+    def fetch_info(room_uuid):
+        """[creator_uuid, room_type, members, chat_table]"""
+        db.cur.execute("SELECT * FROM chatapp_chats.rooms WHERE CHAT_TABLE = %s", (room_uuid,))
+        data = db.con.fetchall()
+        if data == []:
+            return 'ROOM_DNE'
+        return data[0]
+
+class Chat(db):
+    def save_msg(sender, data):
+        """
+        data = room, action, actiondata(send/edit/delete/pin formats)"""
+        room_uuid, action, actiondata = data['room'], data['action'], data['actiondata']
+        match action:
+            case 'send':
+                db.cur.execute(f"INSERT INTO chatapp_chats.{room_uuid}(sender, message, type) VALUES (%s, %s, %s)", (sender, data['actiondata'], data['type']))
+                
+

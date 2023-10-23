@@ -77,13 +77,13 @@ async def get_resp_packet(SESSIONS, ws, de_packet):
     en_packet = en.encrypt_packet(de_packet, SESSIONS[uuid][1])
     return en_packet
 
-async def send_user_packet(SESSIONS, user_uuid, de_packet):
+async def send_user_packet(SESSIONS, SERVER_CREDS, user_uuid, de_packet):
     try:
         con_uuid = list(SESSIONS.keys())[[i[2] for i in list(SESSIONS.values())].index(user_uuid)]
         ws = SESSIONS[con_uuid][0]
         ws.send(en.encrypt_packet(de_packet, SESSIONS[con_uuid[1]]))
     except ValueError:
-        db.queue_packet(user_uuid, de_packet)
+        db.queue_packet(user_uuid, en.encrypt_packet(de_packet, SERVER_CREDS['queue_pubkey']))
 
 async def signup(SESSIONS, SERVER_CREDS, ws, data):
     uuid = list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(ws)]
@@ -202,21 +202,56 @@ async def get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid):
     
 async def create_room(SESSIONS, SERVER_CREDS, ws, data):
     con_uuid = await identify_client(ws, SESSIONS)
-    if len(data['people']) < 2:
+    if len(data['people']) == 0:
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_INSUFFICIENT_PARTICIPANTS'}})
-    elif data['people'][0] != SESSIONS[con_uuid][2]:
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_INVALID_SYNTAX'}})
-    elif data['people'][0] == SESSIONS[con_uuid][2]:
-        flag = db.Room.create(data['people'])
+    else:
+        flag = db.Room.create(SESSIONS[con_uuid][2], data)
     if flag == 'NOT_IMPLEMENTED':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_NOT_IMPLEMENTED'}})
     elif flag == 'MKROOM_ERROR':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_ERROR'}})
     elif flag[0] == 'MKROOM_OK':
-        ##
-        return await get_resp_packet(SESSIONS, ws, {'type':'ROOM_INFO','data':{'room_type':flag[1], 'room_uuid':flag[2], 'members':flag[3], 'dne':flag[4]}})
+        roomdata = {'room_type':flag[1], 'room_name':flag[2], 'room_uuid':flag[3], 'members':flag[4], 'dne':flag[5]}
+        broadcast_packet(SESSIONS, SERVER_CREDS, flag[4], {'type':'JOIN_ROOM', 'data':roomdata})
+        return await get_resp_packet(SESSIONS, ws, {'type':'ROOM_INFO','data':roomdata})
+
+async def alter_room(SESSIONS, SERVER_CREDS, ws, data):
+
+async def broadcast_packet(SESSIONS, SERVER_CREDS, members, packet):
+    for user in members:
+        send_user_packet(SESSIONS, SERVER_CREDS, user, packet)
+        # send the packet to members
 
 async def chat_action(SESSIONS, SERVER_CREDS, ws, data):
+# - user-pubkey
+# - msg-text
+# - msg-smallfile (image, audio, short videos) (upto 32MB) (not implementing now)
+# - msg-largefile (not implementing now)
+# - msg-edit
+# - msg-delete
+    sender = await identify_client(ws, SESSIONS)
+    user = SESSIONS[sender][2]
+    room = db.Room.fetch_info(data['room'])
+    if room == 'ROOM_DNE':
+        ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'ROOM_DNE'}))
+    elif room[1] == user or user in pickle.loads(room[3]):
+        members = pickle.loads(room[3])
+        if data['action'] == 'send':
+            re_data = {'action':'recv', 'actiondata':data['actiondata']}
+        elif data['action'] == 'edit':
+            re_data = {'action':'edited', 'actiondata':data['actiondata']}
+        elif data['action'] == 'delete':
+            re_data = {'action':'deleted', 'actiondata':data['actiondata']}
+        elif data['action'] == 'pinned':
+            re_data = {'action':'edited', 'actiondata':data['actiondata']}
+        else:
+            return 'INVALID_PACKET'
+        de_packet = {'type':'CHAT_ACTION_S', 'data':re_data}
+        db.Chat.save_msg(user, data)
+        broadcast_packet(SESSIONS, SERVER_CREDS, members, de_packet)
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'SENT'}})
+
+async def logout(SESSIONS, SERVER_CREDS, ws, data):
     
 
 async def captcha(SESSIONS, SERVER_CREDS, ws, data):

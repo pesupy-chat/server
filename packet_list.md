@@ -15,8 +15,8 @@
 |c|client-chatpubkey|{'type':'CHAT_ENCRYPT_C', 'data':{'chat_pubkey':pem}}|
 |s|session-token-gen|{'type':'GEN_TOKEN', 'data':{'token':token}}|
 |c|session-token-auth|{'type':'AUTH_TOKEN', 'data':{'user':user,'token':token}}|
-|c|room-create|{'type':'CREATE_ROOM', 'data':{'people':[creator_username,user2,...]}}|
-|c|msg-packet|{'type':'CHAT_ACTION', 'data':{'format':format, 'msg':message}}|
+|c|room-create|{'type':'CREATE_ROOM', 'data':{'room-type':[0|1|2], 'room-name':name, 'people':[user1,user2,...]}}|
+|c|msg-packet|{'type':'CHAT_ACTION', 'data':{'room':room_uuid, 'action':action, 'actiondata':action.format}}|
 |c|room-alter|{'type':'ALTER_ROOM', 'data':{'action':action, 'actiondata':actiondata}}|
 |c|room-sync-request|{'type':'SYNC_ROOM_REQ', 'data':{'room':roomuid, 'count':no_of_messages, 'from':from_msguid}}|
 |s|room-sync-data|{'type':'SYNC_ROOM_DATA', 'data':}
@@ -28,5 +28,11 @@
 - msg-text
 - msg-smallfile (image, audio, short videos) (upto 32MB) (not implementing now)
 - msg-largefile (not implementing now)
-- msg-edit
-- msg-delete
+
+## msg-packet `action`s and format
+
+- send {'format':format, 'content':ciphertext}
+- edit {'msg':msg_uuid, 'content':ciphertext}
+- delete {'msg':msg_uuid, 'reason':ciphertext}
+- pin {'msg':msg_uuid}
+- save-pubkey chat_pubkey_pem
