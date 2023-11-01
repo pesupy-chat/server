@@ -2,7 +2,6 @@ import os
 import getpass
 from i18n import firstrun
 from . import encryption as e
-from os import urandom
 import pickle 
 from yaml import dump as dumpyaml
 try: 
@@ -68,7 +67,7 @@ def save_db_credentials(fkey,workingdir):
         f.write(fkey.encrypt(data))
 
 def save_queue_keypair(fkey, workingdir):
-    prkey, pubkey = e.create_conn_key_pair()
+    prkey, pubkey = e.create_rsa_key_pair()
     pem_prkey, pem_pubkey = e.ser_key_pem(prkey, 'private'), e.ser_key_pem(pubkey, 'public')
     en_pem_prkey = fkey.encrypt(pem_prkey)
     with open(f'{workingdir}/creds/queue_privatekey', 'wb') as f:
@@ -82,8 +81,8 @@ def main():
     workingdir = setup_server_dir()
     setattr(working_dir, 'workingdir', workingdir)
     fkey = e.fernet_initkey(workingdir)
-    save_db_credentials(fkey,workingdir)
-    save_queue_keypair()
+    save_db_credentials(fkey, workingdir)
+    save_queue_keypair(fkey, workingdir)
     del fkey
     host = input("Enter Server Listen Address: ")
     port = int(input("Enter Server Listen Port: "))

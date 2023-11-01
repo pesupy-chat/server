@@ -34,14 +34,7 @@ def parse_date(date_string):
 
 async def establish_conn(SESSIONS, SERVER_CREDS, ws, data):
     print(f"[INFO] Remote {ws.remote_address} attempted connection")
-    try:
-        uuid = UUID(data, version=4)
-    except ValueError:
-        await ws.close(code = 1008, reason = "Connection UUID Invalid")
-        return 'CONN_CLOSED'
-    if uuid in SESSIONS.keys():
-        await ws.close(code = 1008, reason = "Connection UUID Already in use")
-        return 'CONN_CLOSED'
+    uuid = str(UUID.uuid4())
     SESSIONS[uuid] = [ws, None, None] # ws, public_key, user_uuid
 
     print(f"[INFO] Remote {ws.remote_address} initiated connection with UUID: {uuid}")

@@ -5,7 +5,6 @@ from server_modules import firstrun
 from server_modules import encryption as en
 from server_modules import db_handler as db
 from server_modules import packet_handler as p
-import pickle
 import i18n
 from yaml import safe_load as loadyaml
 from yaml import dump as dumpyaml
@@ -146,13 +145,14 @@ if __name__ == "__main__":
                 sys.exit()
             if ch.lower() == 'n':
                 print("Key ah kaanume enna panradhu ippo?")
+                exit()
     else:
         with open(f'{workingdir}/creds/queue_privatekey', 'rb') as f:
             en_pem_prkey = f.read()
             pem_prkey = fkey.decrypt(en_pem_prkey)
             prkey = en.deser_pem(pem_prkey, 'private')
 
-    server_eprkey, server_epbkey = en.create_conn_key_pair()
+    server_eprkey, server_epbkey = en.create_rsa_key_pair()
     SERVER_CREDS['server_eprkey'] = server_eprkey
     SERVER_CREDS['server_epbkey'] = en.ser_key_pem(server_epbkey, 'public')
     SERVER_CREDS['queue_privkey'] = prkey

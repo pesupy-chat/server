@@ -15,7 +15,7 @@ import i18n
 import jwt
 import datetime
 
-def create_conn_key_pair():
+def create_rsa_key_pair():
     # Generate a 2048-bit RSA private key
     private_key = rsa.generate_private_key(
         public_exponent=65537,
