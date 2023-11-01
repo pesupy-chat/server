@@ -104,14 +104,6 @@ def check_if_exists(value, field):
     except IndexError:
         return False
 
-def check_pubkey(uuid):
-    db.cur.execute(f"SELECT PUBKEY FROM chatapp_accounts.pubkeys WHERE UUID = '{uuid}'")
-    data = db.cur.fetchall()
-    if len(data) == 0:
-        return False
-    elif len(data) == 1:
-        return True
-
 def get_uuid(identifier):
     try:
         if '@' not in identifier:
@@ -165,10 +157,21 @@ class Account(db):
         print(f"[DEBUG | for {uuid}]", pwd_query)
         db.cur.execute(pwd_query, (uuid, salted_pwd))
         db.con.commit()
-    
+
+    def check_pubkey(uuid):
+        db.cur.execute(f"SELECT PUBKEY FROM chatapp_accounts.pubkeys WHERE UUID = '{uuid}'")
+        data = db.cur.fetchall()
+        if len(data) == 0:
+            return False
+        elif len(data) == 1:
+            return True
     def set_pubkey(user, key):
         db.cur.execute("INSERT INTO chatapp_accounts.pubkeys VALUES(%s, %s)", (user, key))
         db.con.commit()
+    def get_pubkey(user):
+        db.cur.execute(f"SELECT PUBKEY FROM chatapp_accounts.pubkeys WHERE UUID = '{user}'")
+        data = db.cur.fetchall()
+        return data[0][0]
     
     def check_pwd(pwd, identifier):
         try:

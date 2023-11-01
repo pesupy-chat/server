@@ -95,18 +95,19 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
         password = data['password']
     except KeyError as ero:
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_MISSING_CREDS','desc':ero}})
-    if len(user) > 32:
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_USERNAME_ABOVE_LIMIT'}})
-    elif db.check_if_exists(user, 'username'):
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_USERNAME_ALREADY_EXISTS'}})
-    elif len(email) > 256:
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_EMAIL_ABOVE_LIMIT'}})
-    elif len(fullname) > 256:
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_NAME_ABOVE_LIMIT'}})
-    elif dob == 'PARSE_ERR':
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_DOB_INVALID'}})
-    elif len(password) > 384:
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_PASSWORD_ABOVE_LIMIT'}})
+    # Define validation rules
+    validation_rules = [
+        (len(user) > 32, 'SIGNUP_USERNAME_ABOVE_LIMIT'),
+        (db.check_if_exists(user, 'username'), 'SIGNUP_USERNAME_ALREADY_EXISTS'),
+        (len(email) > 256, 'SIGNUP_EMAIL_ABOVE_LIMIT'),
+        (len(fullname) > 256, 'SIGNUP_NAME_ABOVE_LIMIT'),
+        (dob == 'PARSE_ERR', 'SIGNUP_DOB_INVALID'),
+        (len(password) > 384, 'SIGNUP_PASSWORD_ABOVE_LIMIT')
+    ]
+    # Validate user input
+    for condition, error_message in validation_rules:
+        if condition:
+            return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':error_message}})
     resp_captcha = await captcha(SESSIONS, SERVER_CREDS, ws, data)
     if resp_captcha == True:
         print(f"[INFO] CLIENT {uuid} ATTEMPTED SIGNUP WITH username {user}")
@@ -178,7 +179,7 @@ async def auth(SESSIONS, SERVER_CREDS, ws, data):
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'TOKEN_INVALID'}})
 
 async def get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid):
-    flag = db.check_pubkey(uuid)
+    flag = db.Account.check_pubkey(uuid)
     if not flag:
         await ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CHAT_PUBKEY_MISSING'}}))
         while True:
@@ -202,7 +203,7 @@ async def get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid):
     
 async def create_room(SESSIONS, SERVER_CREDS, ws, data):
     con_uuid = await identify_client(ws, SESSIONS)
-    if len(data['people']) == 0:
+    if len(data['people']) < 2:
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_INSUFFICIENT_PARTICIPANTS'}})
     else:
         flag = db.Room.create(SESSIONS[con_uuid][2], data)
@@ -221,34 +222,30 @@ async def broadcast_packet(SESSIONS, SERVER_CREDS, members, packet):
         # send the packet to members
 
 async def chat_action(SESSIONS, SERVER_CREDS, ws, data):
-# - msg-smallfile (image, audio, short videos) (upto 32MB) (not implementing now)
-# - msg-largefile (not implementing now)
-# BELOW CODE IS FOR TYPE 0 ONLY!
     sender = await identify_client(ws, SESSIONS)
     user = SESSIONS[sender][2]
     room = db.Room.fetch_info(data['room'])
-    # room[2] == 0
+
     if room == 'ROOM_DNE':
         ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'ROOM_DNE'}))
     elif room[1] == user or user in pickle.loads(room[3]):
         members = pickle.loads(room[3])
-        if data['action'] == 'send':
-            re_data = {'action':'recv', 'actiondata':data['actiondata']}
-        elif data['action'] == 'edit':
-            re_data = {'action':'edited', 'actiondata':data['actiondata']}
-        elif data['action'] == 'delete':
-            re_data = {'action':'deleted', 'actiondata':data['actiondata']}
-        elif data['action'] == 'pinned':
-            re_data = {'action':'pinned', 'actiondata':data['actiondata']}
-        else:
-            return 'INVALID_PACKET'
-        de_packet = {'type':'CHAT_ACTION_S', 'data':re_data}
-        flag = db.Chat.save_msg(user, data)
-        if flag == 'SUCCESS':
-            await broadcast_packet(SESSIONS, SERVER_CREDS, members, de_packet)
-            return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'SENT'}})
-        elif flag == 'NOT_YOURS':
-            return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'MSG_NOT_YOURS'}})
+        action_map = {
+            'send': 'recv',
+            'edit': 'edited',
+            'delete': 'deleted',
+            'pinned': 'pinned'
+        }
+        action = data['action']
+        if action in action_map:
+            re_data = {'action': action_map[action], 'actiondata': data['actiondata']}
+            de_packet = {'type':'CHAT_ACTION_S', 'data':re_data}
+            flag = db.Chat.save_msg(user, data)
+            if flag == 'SUCCESS':
+                await broadcast_packet(SESSIONS, SERVER_CREDS, members, de_packet)
+                return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'SENT'}})
+            elif flag == 'NOT_YOURS':
+                return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'MSG_NOT_YOURS'}})
 
 async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     uuid = await identify_client(ws, SESSIONS)

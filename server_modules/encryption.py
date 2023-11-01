@@ -1,4 +1,3 @@
-#from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization, hashes, hmac
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
@@ -6,8 +5,6 @@ from cryptography.hazmat.primitives import padding as spadding
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-#from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-#from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidSignature
 from secrets import token_hex
 from getpass import getpass
@@ -17,23 +14,6 @@ import pickle
 import i18n
 import jwt
 import datetime
-
-#def create_key_pair():
-#    private_key_d = ec.generate_private_key(ec.SECP256K1())
-#    public_key_d = private_key_d.public_key()
-#    return private_key_d, public_key_d
-
-#def derive_key(eprkey, epbkey, keyinfo):
-#    shared_key = eprkey.exchange(
-#        ec.ECDH(), epbkey)
-#    # Perform key derivation.
-#    derived_key = HKDF(
-#        algorithm=hashes.SHA256(),
-#        length=32,
-#        salt=None,
-#        info=keyinfo.encode(),
-#    ).derive(shared_key)
-#    return derived_key
 
 def create_conn_key_pair():
     # Generate a 2048-bit RSA private key
