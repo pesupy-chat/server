@@ -216,9 +216,11 @@ class Room(db):
             query = "INSERT INTO chatapp_chats.rooms(CREATOR_UUID, ROOM_TYPE, ROOM_NAME, MEMBERS, CHAT_TABLE) VALUES (%s, %s, %s, %s, %s)"
             db.cur.execute(query, (data['members'][0], data['room-type'], data['room-name'], members_insert, chat_table))
             db.con.commit()
+            # below line is type0 specific, error handling not implemented yet
+            chat_pubkey = Account.get_pubkey(members_db[1])
             match data['room-type']:
                 case 0:
-                    return ['MKROOM_OK', data['room-type'], data['room-name'], chat_table, members_db, members_dne]
+                    return ['MKROOM_OK', data['room-type'], data['room-name'], chat_table, members_db, members_dne, chat_pubkey]
             
         except:
             return 'MKROOM_ERROR'

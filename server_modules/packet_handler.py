@@ -212,13 +212,13 @@ async def create_room(SESSIONS, SERVER_CREDS, ws, data):
     elif flag == 'MKROOM_ERROR':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_ERROR'}})
     elif flag[0] == 'MKROOM_OK':
-        roomdata = {'room_type':flag[1], 'room_name':flag[2], 'room_uuid':flag[3], 'members':flag[4], 'dne':flag[5]}
+        roomdata = {'room_type':flag[1], 'room_name':flag[2], 'room_uuid':flag[3], 'room_key':flag[6], 'members':flag[4], 'dne':flag[5]}
         await broadcast_packet(SESSIONS, SERVER_CREDS, flag[4], {'type':'JOIN_ROOM', 'data':roomdata})
         return await get_resp_packet(SESSIONS, ws, {'type':'ROOM_INFO','data':roomdata})
 
 async def broadcast_packet(SESSIONS, SERVER_CREDS, members, packet):
     for user in members:
-        send_user_packet(SESSIONS, SERVER_CREDS, user, packet)
+        await send_user_packet(SESSIONS, SERVER_CREDS, user, packet)
         # send the packet to members
 
 async def chat_action(SESSIONS, SERVER_CREDS, ws, data):
