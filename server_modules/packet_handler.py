@@ -32,7 +32,16 @@ def parse_date(date_string):
     else:
         return 'PARSE_ERR'
 
-async def establish_conn(SESSIONS, SERVER_CREDS, ws, data):
+def parse_time(time_string):
+    try:
+        time_obj = datetime.datetime.strptime(time_string, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        return 'PARSE_ERR'
+    else:
+        return 'VALID_TIME'
+    
+
+async def establish_conn(SESSIONS, SERVER_CREDS, ws):
     print(f"[INFO] Remote {ws.remote_address} attempted connection")
     uuid = str(UUID.uuid4())
     SESSIONS[uuid] = [ws, None, None] # ws, public_key, user_uuid
@@ -220,7 +229,7 @@ async def chat_action(SESSIONS, SERVER_CREDS, ws, data):
     room = db.Room.fetch_info(data['room'])
 
     if room == 'ROOM_DNE':
-        ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'ROOM_DNE'}))
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'ROOM_DNE'})
     elif room[1] == user or user in pickle.loads(room[3]):
         members = pickle.loads(room[3])
         action_map = {
@@ -239,6 +248,26 @@ async def chat_action(SESSIONS, SERVER_CREDS, ws, data):
                 return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'SENT'}})
             elif flag == 'NOT_YOURS':
                 return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'MSG_NOT_YOURS'}})
+    else:
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'NOT_IN_ROOM'})
+
+async def sync_chat(SESSIONS, SERVER_CREDS, ws, data):
+    sender = await identify_client(ws, SESSIONS)
+    user = SESSIONS[sender][2]
+    room = db.Room.fetch_info(data['room'])
+    if parse_time(data['from']) == 'PARSE_ERR' or parse_time(data['to']) == 'PARSE_ERR':
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'SYNC_INVALID_TIMESTAMP'})
+
+    if room == 'ROOM_DNE':
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'ROOM_DNE'})
+    elif room[1] == user or user in pickle.loads(room[3]):
+        data = db.Chat.fetch_history(user, data['room'], data['from'], data['to'])
+        sync_data = pickle.dumps(data)
+        de_packet = {'type':'SYNC_ROOM_DATA', 'data':{'room':room, 'sync_data':sync_data}}
+        return await get_resp_packet(SESSIONS, ws, de_packet)
+    else:
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'NOT_IN_ROOM'})
+
 
 async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     uuid = await identify_client(ws, SESSIONS)
@@ -265,7 +294,8 @@ packet_map = {
     'LOGIN':login,
     'AUTH_TOKEN':auth,
     'CREATE_ROOM':create_room,
-    'CHAT_ACTION':chat_action
+    'CHAT_ACTION':chat_action,
+    'SYNC_ROOM_REQ':sync_chat
 }
 
 async def handle(SESSIONS, SERVER_CREDS, packet, ws):
@@ -282,7 +312,7 @@ async def handle(SESSIONS, SERVER_CREDS, packet, ws):
         data = de_packet['data']
 
     if type == 'CONN_INIT':
-        return await establish_conn(SESSIONS, SERVER_CREDS, ws, data)
+        return await establish_conn(SESSIONS, SERVER_CREDS, ws)
     elif type in packet_map.keys():
         func = packet_map[type]
         return await func(SESSIONS, SERVER_CREDS, ws, data)

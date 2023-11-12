@@ -18,8 +18,8 @@
 |c|room-create|{'type':'CREATE_ROOM', 'data':{'room-type':[0|1|2], 'room-name':name, 'people':[user1,user2,...]}}|
 |c|msg-packet|{'type':'CHAT_ACTION', 'data':{'room':room_uuid, 'action':action, 'actiondata':action.format}}|
 |c|room-alter|{'type':'ALTER_ROOM', 'data':{'action':action, 'actiondata':actiondata}}|
-|c|room-sync-request|{'type':'SYNC_ROOM_REQ', 'data':{'room':roomuid, 'count':no_of_messages, 'from':from_msguid}}|
-|s|room-sync-data|{'type':'SYNC_ROOM_DATA', 'data':}
+|c|room-sync-request|{'type':'SYNC_ROOM_REQ', 'data':{'room':roomuid, 'from':from_epoch, 'to':to_epoch}}|
+|s|room-sync-data|{'type':'SYNC_ROOM_DATA', 'data':pickled_list_maybe?}
 |c|read-receipt (implement if make GUI)||
 |c|logout||
 

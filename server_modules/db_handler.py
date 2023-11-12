@@ -267,3 +267,7 @@ class Chat(db):
                 db.cur.execute(f"UPDATE chatapp_chats.{room_uuid} SET pinned = true WHERE messageUUID = %s", (msg,))
                 db.con.commit()
                 return 'SUCCESS'
+    def fetch_history(room, fromtime, totime):
+        db.cur.execute(f"SELECT * FROM chatapp_chats.{room} WHERE timestamp BETWEEN %s AND %s", (fromtime, totime))
+        return db.cur.fetchall()
+    
