@@ -85,7 +85,7 @@ async def send_user_packet(SESSIONS, SERVER_CREDS, user_uuid, de_packet):
         ws = SESSIONS[con_uuid][0]
         ws.send(en.encrypt_packet(de_packet, SESSIONS[con_uuid[1]]))
     except ValueError:
-        await asyncio.to_thread(db.queue_packet(user_uuid, en.encrypt_packet(de_packet, SERVER_CREDS['queue_pubkey'])))
+        db.queue_packet(user_uuid, en.encrypt_packet(de_packet, SERVER_CREDS['queue_pubkey']))
 
 async def signup(SESSIONS, SERVER_CREDS, ws, data):
     uuid = list(SESSIONS.keys())[[i[0] for i in list(SESSIONS.values())].index(ws)]
@@ -100,7 +100,7 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
     # Define validation rules
     validation_rules = [
         (len(user) > 32, 'SIGNUP_USERNAME_ABOVE_LIMIT'),
-        (await asyncio.to_thread(db.check_if_exists(user, 'username')), 'SIGNUP_USERNAME_ALREADY_EXISTS'),
+        (db.check_if_exists(user, 'username'), 'SIGNUP_USERNAME_ALREADY_EXISTS'),
         (len(email) > 256, 'SIGNUP_EMAIL_ABOVE_LIMIT'),
         (len(fullname) > 256, 'SIGNUP_NAME_ABOVE_LIMIT'),
         (dob == 'PARSE_ERR', 'SIGNUP_DOB_INVALID'),
@@ -115,7 +115,7 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
         print(f"[INFO] CLIENT {uuid} ATTEMPTED SIGNUP WITH username {user}")
         salted_pwd = en.salt_pwd(password)
         try:
-            await asyncio.to_thread(db.Account.create(user, fullname, dob, email, salted_pwd))
+            db.Account.create(user, fullname, dob, email, salted_pwd)
         except Exception as errr:
             return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'SIGNUP_ERR','desc':errr}})
         else:
@@ -132,13 +132,13 @@ async def login(SESSIONS, SERVER_CREDS, ws, data):
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_MISSING_CREDS','desc':ero}})
     resp_captcha = await captcha(SESSIONS, SERVER_CREDS, ws, data)
     if resp_captcha == True:
-        flag, uuid = await asyncio.to_thread(db.Account.check_pwd(password, identifier))
+        flag, uuid = db.Account.check_pwd(password, identifier)
         if flag == True:
             if dont_ask_again == True:
                 secret, access_token = en.gen_token(uuid, 30)
             else:
                 secret, access_token = en.gen_token(uuid, 1)
-            await asyncio.to_thread(db.Account.set_token(uuid, secret))
+            db.Account.set_token(uuid, secret)
             en_packet = await get_resp_packet(SESSIONS, ws, {'type':'TOKEN_GEN','data':{'token':access_token}})
             pubkey_resp = await get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid)
             if pubkey_resp == 'CONN_CLOSED':
@@ -157,22 +157,22 @@ async def auth(SESSIONS, SERVER_CREDS, ws, data):
     user = data['data']['user']
     token = data['data']['token']
     con_uuid = await identify_client(ws, SESSIONS)
-    user_uuid = await asyncio.to_thread(db.get_uuid(user))
-    key = await asyncio.to_thread(db.Account.get_token_key(user_uuid))
+    user_uuid = db.get_uuid(user)
+    key = db.Account.get_token_key(user_uuid)
     flag = en.validate_token(key, token, con_uuid)
     if flag == 'TOKEN_OK':
         SESSIONS[con_uuid][2] = user_uuid
         # tasks to run on login
         ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_OK'}}))
         print("[INFO] User", user_uuid, "logged in from", ws.remote_address)
-        packet_queue = await asyncio.to_thread(db.flush_queue(user_uuid))
+        packet_queue = db.flush_queue(user_uuid)
         for i in packet_queue:
             de_packet = en.decrypt_packet(i[0], SERVER_CREDS['queue_privkey'])
             if de_packet['type'] == 'decrypt_error':
                 continue
             else:
                 ws.send(await get_resp_packet(SESSIONS, ws, de_packet))
-        await asyncio.to_thread(db.clear_queue(user=user_uuid))
+        db.clear_queue(user=user_uuid)
         print("[INFO] Flushed queue for user", user_uuid)
         return await get_resp_packet(SESSIONS, ws, {'type':'QUEUE_END'})
     elif flag == 'TOKEN_EXPIRED':
@@ -181,7 +181,7 @@ async def auth(SESSIONS, SERVER_CREDS, ws, data):
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'TOKEN_INVALID'}})
 
 async def get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid):
-    flag = await asyncio.to_thread(db.Account.check_pubkey(uuid))
+    flag = db.Account.check_pubkey(uuid)
     if not flag:
         await ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CHAT_PUBKEY_MISSING'}}))
         while True:
@@ -193,7 +193,7 @@ async def get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid):
                 except Exception as ear:
                     await ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CHAT_PUBKEY_INVALID'}}))
                 else:
-                    await asyncio.to_thread(db.Account.set_pubkey(uuid, de_pubkey['data']['chat_pubkey']))
+                    db.Account.set_pubkey(uuid, de_pubkey['data']['chat_pubkey'])
                     await ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CHAT_PUBKEY_OK'}}))
                     return 'CHAT_PUBKEY_OK'
             else:
@@ -208,7 +208,7 @@ async def create_room(SESSIONS, SERVER_CREDS, ws, data):
     if len(data['people']) < 2:
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_INSUFFICIENT_PARTICIPANTS'}})
     else:
-        flag = await asyncio.to_thread(db.Room.create(SESSIONS[con_uuid][2], data))
+        flag = db.Room.create(SESSIONS[con_uuid][2], data)
     if flag == 'NOT_IMPLEMENTED':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_NOT_IMPLEMENTED'}})
     elif flag == 'MKROOM_ERROR':
@@ -226,7 +226,7 @@ async def broadcast_packet(SESSIONS, SERVER_CREDS, members, packet):
 async def chat_action(SESSIONS, SERVER_CREDS, ws, data):
     sender = await identify_client(ws, SESSIONS)
     user = SESSIONS[sender][2]
-    room = await asyncio.to_thread(db.Room.fetch_info(data['room']))
+    room = db.Room.fetch_info(data['room'])
 
     if room == 'ROOM_DNE':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'ROOM_DNE'})
@@ -242,7 +242,7 @@ async def chat_action(SESSIONS, SERVER_CREDS, ws, data):
         if action in action_map:
             re_data = {'action': action_map[action], 'actiondata': data['actiondata']}
             de_packet = {'type':'CHAT_ACTION_S', 'data':re_data}
-            flag = await asyncio.to_thread(db.Chat.save_msg(user, data))
+            flag = db.Chat.save_msg(user, data)
             if flag == 'SUCCESS':
                 await broadcast_packet(SESSIONS, SERVER_CREDS, members, de_packet)
                 return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'SENT'}})
@@ -254,14 +254,14 @@ async def chat_action(SESSIONS, SERVER_CREDS, ws, data):
 async def sync_chat(SESSIONS, SERVER_CREDS, ws, data):
     sender = await identify_client(ws, SESSIONS)
     user = SESSIONS[sender][2]
-    room = await asyncio.to_thread(db.Room.fetch_info(data['room']))
+    room = db.Room.fetch_info(data['room'])
     if parse_time(data['from']) == 'PARSE_ERR' or parse_time(data['to']) == 'PARSE_ERR':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'SYNC_INVALID_TIMESTAMP'})
 
     if room == 'ROOM_DNE':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'ROOM_DNE'})
     elif room[1] == user or user in pickle.loads(room[3]):
-        data = await asyncio.to_thread(db.Chat.fetch_history(user, data['room'], data['from'], data['to']))
+        data = db.Chat.fetch_history(user, data['room'], data['from'], data['to'])
         sync_data = pickle.dumps(data)
         de_packet = {'type':'SYNC_ROOM_DATA', 'data':{'room':room, 'sync_data':sync_data}}
         return await get_resp_packet(SESSIONS, ws, de_packet)
