@@ -3,7 +3,7 @@ class firstrun():
     empty_config = "Server configuration is empty. Deleting..."
     prompt2 = "Is this the first time you are running the server?"
     config_not_found = "Configuration file not found!"
-    exec = "Executing firstrun script..."
+    exec = "Server will now run its configuration process"
     fix_missing = "Please enter the Server's"
     welcome_message = "Welcome to PesuPy Chat Server Software!"
     setup_server_dir = "Please enter the path to a folder where the server can store its files"

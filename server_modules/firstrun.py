@@ -2,13 +2,15 @@ import os
 import getpass
 from i18n import firstrun
 from . import encryption as e
-from . import db_handler
 import pickle 
 from yaml import dump as dumpyaml
 try: 
     from tkinter import filedialog
 except:
     pass
+
+class working_dir():
+    workingdir = ''
 
 def get_server_dir():
     while True:
@@ -18,7 +20,7 @@ def get_server_dir():
             spath = filedialog.askdirectory()
         except:
             print(firstrun.savedata.nogui)
-            spath = input()
+            spath = input().rstrip('/\\')
         finally:
             break
     return spath
@@ -64,22 +66,30 @@ def save_db_credentials(fkey,workingdir):
     with open(f'{workingdir}/creds/db', 'wb') as f:
         f.write(fkey.encrypt(data))
 
+def save_queue_keypair(fkey, workingdir):
+    prkey, pubkey = e.create_rsa_key_pair()
+    pem_prkey, pem_pubkey = e.ser_key_pem(prkey, 'private'), e.ser_key_pem(pubkey, 'public')
+    en_pem_prkey = fkey.encrypt(pem_prkey)
+    with open(f'{workingdir}/creds/queue_privatekey', 'wb') as f:
+        f.write(en_pem_prkey)
+    with open(f'{workingdir}/creds/queue_publickey', 'wb') as f:
+        f.write(pem_pubkey)
+
 def main():
     print(firstrun.welcome_message)
     print(firstrun.setup_server_dir)
     workingdir = setup_server_dir()
+    setattr(working_dir, 'workingdir', workingdir)
     fkey = e.fernet_initkey(workingdir)
-    save_db_credentials(fkey,workingdir)
+    save_db_credentials(fkey, workingdir)
+    save_queue_keypair(fkey, workingdir)
     del fkey
-    print(firstrun.security)
-    db_handler.decrypt_creds(e.fermat_gen(workingdir), workingdir)
-    print(firstrun.initialize_db)
-    db_handler.initialize_schemas()
     host = input("Enter Server Listen Address: ")
     port = int(input("Enter Server Listen Port: "))
     with open(f'{os.path.dirname(os.path.abspath(__file__))}/../config.yml', 'w') as fi:
         config = {'working_directory': workingdir, 'listen_address': host, 'listen_port': port}
         fi.write(dumpyaml(config))
+
 
 
 
