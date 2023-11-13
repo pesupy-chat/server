@@ -5,46 +5,38 @@ from . import encryption as en
 
 
 
-initialize_ddl = """CREATE DATABASE IF NOT EXISTS chatapp_accounts;
-USE chatapp_accounts;
-CREATE TABLE IF NOT EXISTS users (
-    UUID char(36) NOT NULL, 
+initialize_ddl = """DROP SCHEMA IF EXISTS chatapp_accounts;
+DROP SCHEMA IF EXISTS chatapp_chats;
+DROP SCHEMA IF EXISTS chatapp_internal;
+CREATE DATABASE IF NOT EXISTS chatapp_accounts;
+CREATE TABLE IF NOT EXISTS chatapp_accounts.users (
+    UUID char(36) PRIMARY KEY, 
     USERNAME varchar(32) UNIQUE NOT NULL, 
     FULL_NAME varchar(80) NOT NULL, 
     DOB date NOT NULL, 
     EMAIL varchar(32) DEFAULT NULL, 
-    CREATION timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, 
-    PRIMARY KEY (UUID)
+    CREATION timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS auth (
-    UUID char(36) NOT NULL, 
+CREATE TABLE IF NOT EXISTS chatapp_accounts.auth (
+    UUID char(36) NOT NULL REFERENCES chatapp_accounts.users(UUID) ON DELETE CASCADE ON UPDATE CASCADE, 
     SALTED_HASHBROWN blob NOT NULL, 
-    TOKEN_SECRET tinytext, 
-    KEY authUUID (UUID), 
-    CONSTRAINT authUUID FOREIGN KEY (UUID) REFERENCES users (UUID)
+    TOKEN_SECRET tinytext
 );
-CREATE TABLE IF NOT EXISTS pubkeys (
-    UUID char(36) NOT NULL, 
-    PUBKEY blob NOT NULL, 
-    KEY UUID (UUID), 
-    CONSTRAINT UUID FOREIGN KEY (UUID) REFERENCES users (UUID) ON DELETE CASCADE ON UPDATE CASCADE
+CREATE TABLE IF NOT EXISTS chatapp_accounts.pubkeys (
+    UUID char(36) REFERENCES chatapp_accounts.users(UUID) ON DELETE CASCADE ON UPDATE CASCADE, 
+    PUBKEY blob NOT NULL
 );
 CREATE DATABASE IF NOT EXISTS chatapp_chats;
-USE chatapp_chats;
-CREATE TABLE IF NOT EXISTS rooms (
-    ID int NOT NULL AUTO_INCREMENT, 
-    CREATOR_UUID char(36) NOT NULL, 
+CREATE TABLE IF NOT EXISTS chatapp_chats.rooms (
+    ID int PRIMARY KEY AUTO_INCREMENT, 
+    CREATOR_UUID char(36) NOT NULL REFERENCES chatapp_accounts.users (UUID), 
     ROOM_TYPE int NOT NULL, 
     MEMBERS blob NOT NULL, 
-    CHAT_TABLE tinytext NOT NULL, 
-    PRIMARY KEY (ID), 
-    KEY creatorUUID (CREATOR_UUID), 
-    CONSTRAINT creatorUUID FOREIGN KEY REFERENCES chatapp_accounts.users (UUID)
+    CHAT_TABLE tinytext NOT NULL
 );
 CREATE DATABASE IF NOT EXISTS chatapp_internal;
-USE chatapp_internal;
-CREATE TABLE IF NOT EXISTS settings (PARAM varchar(64) NOT NULL, VALUE varchar(256) NOT NULL);
-CREATE TABLE IF NOT EXISTS `message_queue` (
+CREATE TABLE IF NOT EXISTS chatapp_internal.settings (PARAM varchar(64) NOT NULL, VALUE varchar(256) NOT NULL);
+CREATE TABLE IF NOT EXISTS chatapp_internal.`message_queue` (
     `timestamp` timestamp PRIMARY KEY DEFAULT CURRENT_TIMESTAMP, 
     `recipientUUID` char(36) NOT NULL, 
     `packet` mediumblob NOT NULL
@@ -85,11 +77,12 @@ def decrypt_creds(fkey, workingdir):
 
 def initialize_schemas():
     try:
-        query = queries['initialize'].rstrip(';').split('\n')
+        query = queries['initialize'].rstrip(';').split(';\n')
         for i in query:
+            print('[DEBUG]',i) # print('[INFO] Created schemas successfully')
             db.cur.execute(i)
             db.con.commit()
-            print('[DEBUG]',i) # print('[INFO] Created schemas successfully')
+            print('[DEBUG] OK')
     except Exception as error:
         print('[ERROR] Failed to create schemas:', error)
 

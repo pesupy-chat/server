@@ -98,7 +98,7 @@ if __name__ == "__main__":
         check_missing_config(f, yaml, 'working_directory')
         check_missing_config(f, yaml, 'listen_address')
         check_missing_config(f, yaml, 'listen_port')
-        if not os.path.exists(f"{yaml['working_directory']}/creds/db"):
+        if not os.path.isfile(f"{yaml['working_directory']}/creds/db"):
             raise TypeError("DB_CREDS_NOT_FOUND")
         f.close()
 
