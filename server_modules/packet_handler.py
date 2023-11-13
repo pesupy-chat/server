@@ -84,7 +84,8 @@ async def send_user_packet(SESSIONS, SERVER_CREDS, user_uuid, de_packet):
         con_uuid = list(SESSIONS.keys())[[i[2] for i in list(SESSIONS.values())].index(user_uuid)]
         ws = SESSIONS[con_uuid][0]
         ws.send(en.encrypt_packet(de_packet, SESSIONS[con_uuid[1]]))
-    except ValueError:
+    except:
+        print("[DEBUG] Queued Packet for", user_uuid)
         db.queue_packet(user_uuid, en.encrypt_packet(de_packet, SERVER_CREDS['queue_pubkey']))
 
 async def signup(SESSIONS, SERVER_CREDS, ws, data):
