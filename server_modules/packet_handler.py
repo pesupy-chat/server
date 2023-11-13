@@ -248,6 +248,8 @@ async def chat_action(SESSIONS, SERVER_CREDS, ws, data):
                 return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'SENT'}})
             elif flag == 'NOT_YOURS':
                 return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'MSG_NOT_YOURS'}})
+            elif flag == 'FORMAT_ERR':
+                return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'UNSUPPORTED_MSG_FORMAT'}})
     else:
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'NOT_IN_ROOM'})
 

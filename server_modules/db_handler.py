@@ -238,13 +238,15 @@ class Chat(db):
         """
         data = room, action, actiondata(send/edit/delete/pin formats)"""
         room_uuid, action, actiondata = data['room'], data['action'], data['actiondata']
+        if actiondata['format'] not in ['TEXT']: # add more message formats here
+            return 'FORMAT_ERR'
         match action:
             case 'send':
                 db.cur.execute(f"INSERT INTO chatapp_chats.{room_uuid}(messageUUID, sender, message, type) VALUES (%s, %s, %s, %s)", (str(uuid4()), sender, actiondata['content'], actiondata['format']))
                 db.con.commit()
                 return 'SUCCESS'
             case 'edit':
-                msg = data['actiondata']['msg']
+                msg = actiondata['msg']
                 db.cur.execute(f"SELECT sender FROM chatapp_chats.{room_uuid} WHERE messageUUID = %s", (msg,))
                 o_sender = db.cur.fetchall()[0][0]
                 if sender == o_sender:
