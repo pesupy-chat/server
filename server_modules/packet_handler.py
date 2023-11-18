@@ -140,11 +140,7 @@ async def login(SESSIONS, SERVER_CREDS, ws, data):
                 secret, access_token = en.gen_token(uuid, 1)
             db.Account.set_token(uuid, secret)
             en_packet = await get_resp_packet(SESSIONS, ws, {'type':'TOKEN_GEN','data':{'token':access_token}})
-            pubkey_resp = await get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid)
-            if pubkey_resp == 'CONN_CLOSED':
-                return 'CONN_CLOSED'
-            elif pubkey_resp == 'CHAT_PUBKEY_OK':
-                return en_packet
+            return en_packet
         elif flag == False:
             return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_INCORRECT_PASSWORD'}})
         elif flag == 'ACCOUNT_DNE':
