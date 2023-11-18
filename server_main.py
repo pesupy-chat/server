@@ -60,7 +60,7 @@ async def catch(websocket):
     try:
         while True:
             result = await p.handle(SESSIONS, SERVER_CREDS, await websocket.recv(), websocket)
-            if result in ('CONN_CLOSED', 'USER_PACKET'):
+            if result in ('CONN_CLOSED',):
                 pass
             else:
                 await websocket.send(result)
@@ -76,7 +76,7 @@ async def main(host, port):
     async with websockets.serve(
             catch, host=host, port=port,
             ping_interval=30, ping_timeout=None, close_timeout=None,
-            max_size=10485760
+            max_size=1048576
     ):
         await asyncio.Future()  # run forever
 
@@ -120,43 +120,9 @@ if __name__ == "__main__":
         print(i18n.firstrun.exit)
         sys.exit()
 
-    try:
-        with open(f'{workingdir}/creds/queue_publickey', 'rb') as f:
-            pem_pubkey = f.read()
-            pubkey = en.deser_pem(pem_pubkey, 'public')
-    except FileNotFoundError:
-        print("Could not find packet queue public key. Server will now generate it from the private key.")
-        try:
-            with open(f'{workingdir}/creds/queue_privatekey', 'rb') as f:
-                en_pem_prkey = f.read()
-            pem_prkey = fkey.decrypt(en_pem_prkey)
-            prkey = en.deser_pem(pem_prkey, 'private')
-            pubkey = prkey.public_key()
-
-            with open(f'{workingdir}/creds/queue_publickey', 'wb') as f:
-                f.write(pem_pubkey)
-        except FileNotFoundError:
-            print("Could not find packet queue keypair. Server will now generate it again.")
-            ch = input("This will cause previously unsent packets in the queue to be lost. Continue? (y/n) > ")
-            if ch.lower() == 'y':
-                db.clear_queue(user=None)
-                firstrun.save_queue_keypair(fkey, workingdir)
-                print(i18n.firstrun.exit)
-                sys.exit()
-            if ch.lower() == 'n':
-                print("Key ah kaanume enna panradhu ippo?")
-                exit()
-    else:
-        with open(f'{workingdir}/creds/queue_privatekey', 'rb') as f:
-            en_pem_prkey = f.read()
-            pem_prkey = fkey.decrypt(en_pem_prkey)
-            prkey = en.deser_pem(pem_prkey, 'private')
-
     server_eprkey, server_epbkey = en.create_rsa_key_pair()
     SERVER_CREDS['server_eprkey'] = server_eprkey
     SERVER_CREDS['server_epbkey'] = en.ser_key_pem(server_epbkey, 'public')
-    SERVER_CREDS['queue_privkey'] = prkey
-    SERVER_CREDS['queue_pubkey'] = pubkey
 
     print("[INFO] SERVER ONLINE!")
     try:

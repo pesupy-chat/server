@@ -180,97 +180,6 @@ async def auth(SESSIONS, SERVER_CREDS, ws, data):
     elif flag == 'TOKEN_INVALID':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'TOKEN_INVALID'}})
 
-async def get_pubkey(SESSIONS, SERVER_CREDS, ws, uuid):
-    flag = db.Account.check_pubkey(uuid)
-    if not flag:
-        await ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CHAT_PUBKEY_MISSING'}}))
-        while True:
-            de_pubkey = en.decrypt_packet(await ws.recv(), SERVER_CREDS['server_eprkey'])
-            print(de_pubkey)
-            if de_pubkey['type'] == 'CHAT_ENCRYPT_C':
-                try:
-                    s.load_pem_public_key(de_pubkey['data']['chat_pubkey'])
-                except Exception as ear:
-                    await ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CHAT_PUBKEY_INVALID'}}))
-                else:
-                    db.Account.set_pubkey(uuid, de_pubkey['data']['chat_pubkey'])
-                    await ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'CHAT_PUBKEY_OK'}}))
-                    return 'CHAT_PUBKEY_OK'
-            else:
-                print(f"[INFO] CLIENT un-established {ws.remote_address} DISCONNECTED due to INVALID_PACKET")
-                await ws.close(code = 1008, reason = "Invalid packet structure")
-                return 'CONN_CLOSED'
-    elif flag:
-        return 'CHAT_PUBKEY_OK'
-    
-async def create_room(SESSIONS, SERVER_CREDS, ws, data):
-    con_uuid = await identify_client(ws, SESSIONS)
-    if len(data['people']) < 2:
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_INSUFFICIENT_PARTICIPANTS'}})
-    else:
-        flag = db.Room.create(SESSIONS[con_uuid][2], data)
-    if flag == 'NOT_IMPLEMENTED':
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_NOT_IMPLEMENTED'}})
-    elif flag == 'MKROOM_ERROR':
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'MKROOM_ERROR'}})
-    elif flag[0] == 'MKROOM_OK':
-        roomdata = {'room_type':flag[1], 'room_name':flag[2], 'room_uuid':flag[3], 'room_key':flag[6], 'members':flag[4], 'dne':flag[5]}
-        await broadcast_packet(SESSIONS, SERVER_CREDS, flag[4], {'type':'JOIN_ROOM', 'data':roomdata})
-        return await get_resp_packet(SESSIONS, ws, {'type':'ROOM_INFO','data':roomdata})
-
-async def broadcast_packet(SESSIONS, SERVER_CREDS, members, packet):
-    for user in members:
-        await send_user_packet(SESSIONS, SERVER_CREDS, user, packet)
-        # send the packet to members
-
-async def chat_action(SESSIONS, SERVER_CREDS, ws, data):
-    sender = await identify_client(ws, SESSIONS)
-    user = SESSIONS[sender][2]
-    room = db.Room.fetch_info(data['room'])
-
-    if room == 'ROOM_DNE':
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'ROOM_DNE'})
-    elif room[1] == user or user in pickle.loads(room[3]):
-        members = pickle.loads(room[3])
-        action_map = {
-            'send': 'recv',
-            'edit': 'edited',
-            'delete': 'deleted',
-            'pinned': 'pinned'
-        }
-        action = data['action']
-        if action in action_map:
-            re_data = {'action': action_map[action], 'actiondata': data['actiondata']}
-            de_packet = {'type':'CHAT_ACTION_S', 'data':re_data}
-            flag = db.Chat.save_msg(user, data)
-            if flag == 'SUCCESS':
-                await broadcast_packet(SESSIONS, SERVER_CREDS, members, de_packet)
-                return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'SENT'}})
-            elif flag == 'NOT_YOURS':
-                return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'MSG_NOT_YOURS'}})
-            elif flag == 'FORMAT_ERR':
-                return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':{'sig':'UNSUPPORTED_MSG_FORMAT'}})
-    else:
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'NOT_IN_ROOM'})
-
-async def sync_chat(SESSIONS, SERVER_CREDS, ws, data):
-    sender = await identify_client(ws, SESSIONS)
-    user = SESSIONS[sender][2]
-    room = db.Room.fetch_info(data['room'])
-    if parse_time(data['from']) == 'PARSE_ERR' or parse_time(data['to']) == 'PARSE_ERR':
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'SYNC_INVALID_TIMESTAMP'})
-
-    if room == 'ROOM_DNE':
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'ROOM_DNE'})
-    elif room[1] == user or user in pickle.loads(room[3]):
-        data = db.Chat.fetch_history(user, data['room'], data['from'], data['to'])
-        sync_data = pickle.dumps(data)
-        de_packet = {'type':'SYNC_ROOM_DATA', 'data':{'room':room, 'sync_data':sync_data}}
-        return await get_resp_packet(SESSIONS, ws, de_packet)
-    else:
-        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS', 'data':'NOT_IN_ROOM'})
-
-
 async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     uuid = await identify_client(ws, SESSIONS)
     challenge = str(randint(100000,999999))
@@ -294,10 +203,7 @@ upacket_map = {
 packet_map = {
     'SIGNUP':signup,
     'LOGIN':login,
-    'AUTH_TOKEN':auth,
-    'CREATE_ROOM':create_room,
-    'CHAT_ACTION':chat_action,
-    'SYNC_ROOM_REQ':sync_chat
+    'AUTH_TOKEN':auth
 }
 
 async def handle(SESSIONS, SERVER_CREDS, packet, ws):

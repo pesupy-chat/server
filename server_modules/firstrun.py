@@ -13,42 +13,39 @@ class working_dir():
     workingdir = ''
 
 def get_server_dir():
-    while True:
-        try:
-            # Open GUI file picker if possible
-            print(firstrun.savedata.gui)
-            spath = filedialog.askdirectory()
-        except:
-            print(firstrun.savedata.nogui)
-            spath = input().rstrip('/\\')
-        finally:
-            break
-    return spath
+    try:
+        print(firstrun.savedata.gui)
+        return filedialog.askdirectory()
+    except:
+        print(firstrun.savedata.nogui)
+        return input().rstrip('/\\')
+
+def create_directory(path):
+    try:
+        os.mkdir(path)
+        print(firstrun.savedata.created)
+    except OSError as e:
+        print(f"{firstrun.savedata.error}:\n{e}")
+        return False
+    return True
 
 def setup_server_dir():
     while True:
-        while True:
-            spath = get_server_dir()
-            # Do nothing if folder exists
-            if os.path.exists(spath) and os.path.isdir(spath):
+        spath = get_server_dir()
+        if os.path.exists(spath) and os.path.isdir(spath):
+            pass
+        elif os.path.exists(spath) and not os.path.isdir(spath):
+            spath = input(f"{firstrun.savedata.not_a_dir}:\n")
+        elif not os.path.exists(spath):
+            if not create_directory(spath):
+                spath = input(f"{firstrun.savedata.input_writable}:\n")
+                continue
+
+        creds_path = f'{spath}/creds'
+        if not os.path.exists(creds_path):
+            if create_directory(creds_path):
                 break
-            # If either the path leads to a file or is not writable (or invalid)
-            elif os.path.exists(spath) and not os.path.isdir(spath):
-                spath = input(f"{firstrun.savedata.not_a_dir}:\n")
-            elif not os.path.exists(spath):
-                print(firstrun.savedata.creating, end=' ')
-                try:
-                    os.mkdir(spath)
-                except OSError as e:
-                    print(f"{firstrun.savedata.error}:\n{e}")
-                    spath = input(f"{firstrun.savedata.input_writable}:\n")
-                else:
-                    print(firstrun.savedata.created)
-                    break
-        if not os.path.exists(f'{spath}/creds'):
-            os.mkdir(f'{spath}/creds')
-            break
-        elif os.path.exists(f'{spath}/creds'):
+        else:
             print(firstrun.savedata.data_exists)
 
     return spath
@@ -66,15 +63,6 @@ def save_db_credentials(fkey,workingdir):
     with open(f'{workingdir}/creds/db', 'wb') as f:
         f.write(fkey.encrypt(data))
 
-def save_queue_keypair(fkey, workingdir):
-    prkey, pubkey = e.create_rsa_key_pair()
-    pem_prkey, pem_pubkey = e.ser_key_pem(prkey, 'private'), e.ser_key_pem(pubkey, 'public')
-    en_pem_prkey = fkey.encrypt(pem_prkey)
-    with open(f'{workingdir}/creds/queue_privatekey', 'wb') as f:
-        f.write(en_pem_prkey)
-    with open(f'{workingdir}/creds/queue_publickey', 'wb') as f:
-        f.write(pem_pubkey)
-
 def main():
     print(firstrun.welcome_message)
     print(firstrun.setup_server_dir)
@@ -82,7 +70,6 @@ def main():
     setattr(working_dir, 'workingdir', workingdir)
     fkey = e.fernet_initkey(workingdir)
     save_db_credentials(fkey, workingdir)
-    save_queue_keypair(fkey, workingdir)
     del fkey
     host = input("Enter Server Listen Address: ")
     port = int(input("Enter Server Listen Port: "))

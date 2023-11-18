@@ -5,7 +5,7 @@ class firstrun():
     config_not_found = "Configuration file not found!"
     exec = "Server will now run its configuration process"
     fix_missing = "Please enter the Server's"
-    welcome_message = "Welcome to PesuPy Chat Server Software!"
+    welcome_message = "Welcome to the Account System Demonstration"
     setup_server_dir = "Please enter the path to a folder where the server can store its files"
     keypair_setup = "Setting up Server Keypair..."
     initialize_db = "Setting up Databases for use..."
