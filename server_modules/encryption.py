@@ -149,7 +149,6 @@ def salt_pwd(password):
 
 def db_check_pwd(pwd, saltedpwd):
     salted_pwd = pickle.loads(saltedpwd)
-    print(f"[DEBUG] {salted_pwd}")
     salt, key = salted_pwd['salt'], salted_pwd['key']
     password = pwd.encode()
     kdf = PBKDF2HMAC(

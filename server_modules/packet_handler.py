@@ -46,7 +46,7 @@ async def establish_conn(SESSIONS, SERVER_CREDS, ws):
     SESSIONS[uuid] = [ws, None, None] # ws, public_key, user_uuid
 
     print(f"[INFO] Remote {ws.remote_address} initiated connection with UUID: {uuid}")
-    print(f"[INFO] SENDING PUBLIC KEY to {uuid}")
+    print(f"[INFO] Sending public key to {uuid}")
 
     # Encrypt Connection
     await ws.send(pickle.dumps({'type':'CONN_ENCRYPT_S','data':SERVER_CREDS['server_epbkey']}))
@@ -55,12 +55,12 @@ async def establish_conn(SESSIONS, SERVER_CREDS, ws):
         try:
             client_epbkey = s.load_pem_public_key(client_epbkey['data'])
         except Exception as e:
-            print(f"[INFO] CLIENT un-established {ws.remote_address} DISCONNECTED due to INVALID_PACKET")
+            print(f"[INFO] Client un-established {ws.remote_address} DISCONNECTED due to INVALID_PACKET")
             await ws.close(code = 1008, reason = "Invalid packet structure")
             return 'CONN_CLOSED'
         
         SESSIONS[uuid][1] = client_epbkey
-        print(f"[INFO] Received public key for {ws.remote_address}")
+        print(f"[INFO] Received public key for {uuid}")
         del client_epbkey
         return en.encrypt_packet(
             {'type':'STATUS', 'data':{'sig':'CONN_OK'}},
@@ -140,7 +140,7 @@ async def login(SESSIONS, SERVER_CREDS, ws, data):
                 secret, access_token = en.gen_token(uuid, 1)
             db.Account.set_token(uuid, secret)
             en_packet = await get_resp_packet(SESSIONS, ws, {'type':'TOKEN_GEN','data':{'token':access_token}})
-            return en_packet
+            await ws.send(en_packet)
         elif flag == False:
             return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_INCORRECT_PASSWORD'}})
         elif flag == 'ACCOUNT_DNE':
@@ -161,20 +161,22 @@ async def auth(SESSIONS, SERVER_CREDS, ws, data):
         # tasks to run on login
         ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_OK'}}))
         print("[INFO] User", user_uuid, "logged in from", ws.remote_address)
-        packet_queue = db.flush_queue(user_uuid)
-        for i in packet_queue:
-            de_packet = en.decrypt_packet(i[0], SERVER_CREDS['queue_privkey'])
-            if de_packet['type'] == 'decrypt_error':
-                continue
-            else:
-                ws.send(await get_resp_packet(SESSIONS, ws, de_packet))
-        db.clear_queue(user=user_uuid)
-        print("[INFO] Flushed queue for user", user_uuid)
-        return await get_resp_packet(SESSIONS, ws, {'type':'QUEUE_END'})
     elif flag == 'TOKEN_EXPIRED':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'TOKEN_EXPIRED'}})
     elif flag == 'TOKEN_INVALID':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'TOKEN_INVALID'}})
+
+async def logout(SESSIONS, SERVER_CREDS, ws, data):
+    sender = await identify_client(ws, SESSIONS)
+    try:
+        user = SESSIONS[sender][2]
+        flag = db.Account.logout(user)
+        if flag == 'SUCCESS':
+            return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGOUT_OK'}})
+        elif flag == 'FAILURE':
+            return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGOUT_ERR'}})
+    except KeyError:
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'NOT_LOGGED_IN'}})
 
 async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     uuid = await identify_client(ws, SESSIONS)
@@ -188,7 +190,7 @@ async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     resp = await ws.recv()
 
     # handle possible INVALID_PACKET in next line 
-    de_resp = pickle.loads(en.decrypt_packet(resp, SERVER_CREDS['server_eprkey']))
+    de_resp = en.decrypt_packet(resp, SERVER_CREDS['server_eprkey'])
     de_resp = de_resp['data']['solved']
     return int(de_resp) == int(challenge)
 
@@ -199,7 +201,8 @@ upacket_map = {
 packet_map = {
     'SIGNUP':signup,
     'LOGIN':login,
-    'AUTH_TOKEN':auth
+    'AUTH_TOKEN':auth,
+    'LOGOUT':logout
 }
 
 async def handle(SESSIONS, SERVER_CREDS, packet, ws):
@@ -207,7 +210,6 @@ async def handle(SESSIONS, SERVER_CREDS, packet, ws):
         de_packet = pickle.loads(packet)
     else:
         de_packet = en.decrypt_packet(packet, SERVER_CREDS['server_eprkey'])
-
     if de_packet['type'] == 'INVALID_PACKET':
         await disconnect(ws, 1008, "Invalid Packet Structure")
         return 'CONN_CLOSED'

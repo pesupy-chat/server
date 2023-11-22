@@ -109,6 +109,7 @@ class Account(db):
         db.cur.execute("SELECT SALTED_HASHBROWN FROM chatapp_accounts.auth WHERE UUID = %s", (uuid,))
         saltedpwd = db.cur.fetchall()[0][0]
         flag = en.db_check_pwd(pwd, saltedpwd)
+        print("[DEBUG]",flag,uuid)
         return (flag, uuid)
 
     def set_token(uuid, secret):
@@ -117,3 +118,10 @@ class Account(db):
     def get_token_key(uuid):
         db.cur.execute("SELECT TOKEN_SECRET FROM chatapp_accounts.auth WHERE UUID = %s", (uuid,))
         return db.cur.fetchall()[0][0]
+    def logout(uuid):
+        try:
+            db.cur.execute("DELETE TOKEN_SECRET FROM chatapp_accounts.auth WHERE UUID = %s", (uuid,))
+            db.con.commit()
+            return 'SUCCESS'
+        except:
+            return 'FAILURE'

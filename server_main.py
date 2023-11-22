@@ -75,7 +75,7 @@ async def catch(websocket):
 async def main(host, port):
     async with websockets.serve(
             catch, host=host, port=port,
-            ping_interval=30, ping_timeout=None, close_timeout=None,
+            ping_interval=120, ping_timeout=None, close_timeout=None,
             max_size=1048576
     ):
         await asyncio.Future()  # run forever
