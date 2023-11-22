@@ -184,7 +184,7 @@ def validate_token(key, token, user):
         decoded_token = jwt.decode(token, key, algorithms=["HS256"])
     except:
         return 'TOKEN_INVALID'
-    timenow = datetime.datetime.utcnow()
+    timenow = datetime.datetime.utcnow().timestamp()
     if decoded_token['sub'] == user and timenow < decoded_token['exp']:
         return 'TOKEN_OK'
     elif decoded_token['sub'] == user and timenow > decoded_token['exp']:

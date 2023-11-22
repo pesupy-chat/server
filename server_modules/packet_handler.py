@@ -140,7 +140,8 @@ async def login(SESSIONS, SERVER_CREDS, ws, data):
                 secret, access_token = en.gen_token(uuid, 1)
             db.Account.set_token(uuid, secret)
             en_packet = await get_resp_packet(SESSIONS, ws, {'type':'TOKEN_GEN','data':{'token':access_token}})
-            await ws.send(en_packet)
+            print("[INFO] Generated token for", uuid)
+            return en_packet
         elif flag == False:
             return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_INCORRECT_PASSWORD'}})
         elif flag == 'ACCOUNT_DNE':
@@ -150,17 +151,22 @@ async def login(SESSIONS, SERVER_CREDS, ws, data):
 
 async def auth(SESSIONS, SERVER_CREDS, ws, data):
     # REMINDER TO HANDLE LOGIN FROM TWO DEVICES
-    user = data['data']['user']
-    token = data['data']['token']
+    user = data['user']
+    token = data['token']
     con_uuid = await identify_client(ws, SESSIONS)
     user_uuid = db.get_uuid(user)
+    if user_uuid == 'ACCOUNT_DNE':
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'ACCOUNT_DNE'}})
     key = db.Account.get_token_key(user_uuid)
-    flag = en.validate_token(key, token, con_uuid)
+    if key == 'TOKEN_NOT_FOUND':
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'TOKEN_NOT_FOUND'}})
+    flag = en.validate_token(key, token, user_uuid)
     if flag == 'TOKEN_OK':
         SESSIONS[con_uuid][2] = user_uuid
         # tasks to run on login
-        ws.send(await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_OK'}}))
         print("[INFO] User", user_uuid, "logged in from", ws.remote_address)
+        print("[DEBUG] SESSIONS:", SESSIONS)
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGIN_OK'}})
     elif flag == 'TOKEN_EXPIRED':
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'TOKEN_EXPIRED'}})
     elif flag == 'TOKEN_INVALID':
@@ -168,15 +174,16 @@ async def auth(SESSIONS, SERVER_CREDS, ws, data):
 
 async def logout(SESSIONS, SERVER_CREDS, ws, data):
     sender = await identify_client(ws, SESSIONS)
-    try:
-        user = SESSIONS[sender][2]
-        flag = db.Account.logout(user)
-        if flag == 'SUCCESS':
-            return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGOUT_OK'}})
-        elif flag == 'FAILURE':
-            return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGOUT_ERR'}})
-    except KeyError:
+    user = SESSIONS[sender][2]
+    if not user:
         return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'NOT_LOGGED_IN'}})
+    flag = db.Account.logout(user)
+    if flag == 'SUCCESS':
+        SESSIONS[sender][2] = None
+        print("[DEBUG] SESSIONS:", SESSIONS)
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGOUT_OK'}})
+    elif flag == 'FAILURE':
+        return await get_resp_packet(SESSIONS, ws, {'type':'STATUS','data':{'sig':'LOGOUT_ERR'}})
 
 async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     uuid = await identify_client(ws, SESSIONS)

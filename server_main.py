@@ -62,7 +62,7 @@ async def catch(websocket):
             result = await p.handle(SESSIONS, SERVER_CREDS, await websocket.recv(), websocket)
             if result in ('CONN_CLOSED',):
                 pass
-            else:
+            elif result:
                 await websocket.send(result)
     # Handle disconnection due to any exception
     except Exception as err3:
