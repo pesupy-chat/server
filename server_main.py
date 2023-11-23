@@ -24,9 +24,9 @@ def execute_firstrun():
 def check_missing_config(f, yaml, config):
     try:
         if yaml[config] is None:
-            print(i18n.firstrun.prompt1 + config)
+            print(i18n.firstrun.setting_not_found.format(config))
             if config == 'working_directory':
-                print(i18n.firstrun.prompt2)
+                print(i18n.firstrun.ft_question)
                 while True:
                     choice = input("(Y / N) > ")
                     if choice.lower() == 'y':
@@ -42,12 +42,12 @@ def check_missing_config(f, yaml, config):
             else:
                 fill_missing_config(f, yaml, config)
     except KeyError:
-        print(i18n.firstrun.prompt1 + config)
+        print(i18n.firstrun.setting_not_found.format(config))
         fill_missing_config(f, yaml, config)
 
 
 def fill_missing_config(f, yaml, config):
-    print(i18n.firstrun.fix_missing, config)
+    print(i18n.firstrun.fix_missing.format(config))
     yaml[config] = input('\n> ')
     if config in ['listen_port', 'any_other_int_type_config']:
         yaml[config] = int(yaml[config])
@@ -106,7 +106,7 @@ if __name__ == "__main__":
         print(i18n.firstrun.config_not_found, i18n.firstrun.exec)
         execute_firstrun()
     except TypeError:
-        print("Could not find database credentials. Server will now run its configuration process again")
+        print(i18n.database.creds_not_found)
         execute_firstrun()
 
     workingdir = yaml['working_directory']

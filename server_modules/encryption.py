@@ -28,12 +28,13 @@ def create_rsa_key_pair():
 def fernet_initkey(workingdir):
     passwd = ''
     while True:
-        passwd = getpass(i18n.firstrun.passwd.input)
-        confirm = getpass(i18n.firstrun.passwd.confirm)
+        print(i18n.firstrun.password.explain)
+        passwd = getpass(i18n.firstrun.password.input)
+        confirm = getpass(i18n.firstrun.password.confirm)
         if passwd == confirm:
             break
         else:
-            print(i18n.firstrun.passwd.retry)
+            print(i18n.firstrun.password.retry)
     # Generate a Fernet key with the password and save the salt
     salt = urandom(16)
     with open(f"{workingdir}/creds/salt", "wb") as f:

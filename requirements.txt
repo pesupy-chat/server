@@ -2,7 +2,7 @@ asyncio
 captcha
 cffi
 cryptography
-mysql-connector
+mysql-connector-python
 Pillow
 pycparser
 PyYAML
