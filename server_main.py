@@ -49,7 +49,7 @@ def check_missing_config(f, yaml, config):
 def fill_missing_config(f, yaml, config):
     print(i18n.firstrun.fix_missing.format(config))
     yaml[config] = input('\n> ')
-    if config in ['listen_port', 'any_other_int_type_config']:
+    if config in ('listen_port', 'any_other_int_type_config'):
         yaml[config] = int(yaml[config])
     f.seek(0)
     f.write(dumpyaml(yaml))
@@ -67,7 +67,7 @@ async def catch(websocket):
     # Handle disconnection due to any exception
     except Exception as err3:
         client = await p.identify_client(websocket, SESSIONS)
-        print(f"[INFO] CLIENT {client} DISCONNECTED due to\n\t", err3)
+        print(i18n.log.tags.info + i18n.log.conn.disconnected.format(client, err3))
         del SESSIONS[client]
         return None
 
@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
     try:
         rootdir = os.path.dirname(os.path.abspath(__file__))
-        print(i18n.log.tags.info + i18n.log.server_start.format(rootdir))
+        print('\n' + i18n.log.tags.info + i18n.log.server_start.format(rootdir))
         f = open(f'{rootdir}/config.yml', 'r+')
         yaml = loadyaml(f.read())
         if not yaml:
@@ -99,14 +99,12 @@ if __name__ == "__main__":
         check_missing_config(f, yaml, 'listen_address')
         check_missing_config(f, yaml, 'listen_port')
         if not os.path.isfile(f"{yaml['working_directory']}/creds/db"):
-            raise TypeError("DB_CREDS_NOT_FOUND")
+            print(i18n.database.creds_not_found)
+            execute_firstrun()
         f.close()
 
     except FileNotFoundError as err:
         print(i18n.firstrun.config_not_found, i18n.firstrun.exec)
-        execute_firstrun()
-    except TypeError:
-        print(i18n.database.creds_not_found)
         execute_firstrun()
 
     workingdir = yaml['working_directory']
@@ -116,7 +114,7 @@ if __name__ == "__main__":
         fkey = en.fermat_gen(workingdir)
         db.decrypt_creds(fkey, workingdir)
     except Exception as w:
-        print("Error while decrypting database credentials. Check your password\n", w)
+        print(i18n.database.de_cred_fail.format(w))
         print(i18n.firstrun.exit)
         sys.exit()
 
@@ -124,11 +122,11 @@ if __name__ == "__main__":
     SERVER_CREDS['server_eprkey'] = server_eprkey
     SERVER_CREDS['server_epbkey'] = en.ser_key_pem(server_epbkey, 'public')
 
-    print("[INFO] SERVER ONLINE!")
+    print('\n' + i18n.log.tags.info + i18n.log.server_online)
     try:
         asyncio.run(main(host, port))
     except KeyboardInterrupt:
-        print('\n[INFO] Goodbye!')
+        print('\n' + i18n.log.tags.info + i18n.log.server_exit)
         db.close()
         sys.exit()
 

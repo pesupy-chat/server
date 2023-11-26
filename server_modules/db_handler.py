@@ -2,6 +2,7 @@ import mysql.connector as sqltor
 from uuid import uuid4
 import pickle
 from . import encryption as en
+from i18n import log
 
 
 
@@ -38,31 +39,32 @@ def decrypt_creds(fkey, workingdir):
         setattr(db, 'con', sqltor.connect(host = dict['host'], user = dict['user'], passwd = dict['passwd']))
         setattr(db, 'cur', db.con.cursor())
         if db.con.is_connected():
-            print('[INFO] Connected to database ',dict['host'],':',dict['port'],sep='')
+            print(log.tags.info + log.conn.db_conn_success.format(dict['host'],dict['port']))
             db.cur.execute("USE pfyt_accounts")
     except sqltor.errors.ProgrammingError as errrr:
-        print('[ERROR] Could not connect to database:', errrr)
+        print(log.tags.error + log.conn.db_conn_err.format(errrr))
 
 def initialize_schemas():
     try:
         query = queries['initialize'].rstrip(';').split(';\n')
         for i in query:
-            print('[DEBUG]',i) # print('[INFO] Created schemas successfully')
             db.cur.execute(i)
             db.con.commit()
-            print('[DEBUG] OK')
+        print(log.tags.info + log.tags.db.init_success)
     except Exception as error:
-        print('[ERROR] Failed to create schemas:', error)
+        print(log.tags.error + log.tags.db.init_fail.format(error))
 
 def check_if_exists(value, field):
     col = fields_to_check[field]['attribute']
     table = fields_to_check[field]['table']
-    db.cur.execute(f"select {col} from {table} where {col} = '{value}'")
+    db.cur.execute(f"SELECT {col} FROM {table} WHERE {col} = '{value}'")
     data = db.cur.fetchall() 
     try:
         if data[0][0] == value:
             return True
     except IndexError:
+        return False
+    else:
         return False
 
 def get_uuid(identifier):
@@ -90,7 +92,6 @@ class Account(db):
         db.cur.execute(query, (uuid, username, fullname, dob, email))
         db.con.commit()
         pwd_query = "INSERT INTO pfyt_accounts.auth(UUID, SALTED_HASHBROWN) VALUES (%s, %s)"
-        print(f"[DEBUG | for {uuid}]", pwd_query)
         db.cur.execute(pwd_query, (uuid, salted_pwd))
         db.con.commit()
     
@@ -107,12 +108,12 @@ class Account(db):
         db.cur.execute("SELECT SALTED_HASHBROWN FROM pfyt_accounts.auth WHERE UUID = %s", (uuid,))
         saltedpwd = db.cur.fetchall()[0][0]
         flag = en.db_check_pwd(pwd, saltedpwd)
-        print("[DEBUG]",flag,uuid)
         return (flag, uuid)
 
     def set_token(uuid, secret):
         db.cur.execute("UPDATE pfyt_accounts.auth SET TOKEN_SECRET = %s WHERE UUID = %s", (secret, uuid))
         db.con.commit()
+
     def get_token_key(uuid):
         db.cur.execute("SELECT TOKEN_SECRET FROM pfyt_accounts.auth WHERE UUID = %s", (uuid,))
         try:
@@ -123,6 +124,7 @@ class Account(db):
                 return 'TOKEN_NOT_FOUND'
         except IndexError:
             return 'TOKEN_NOT_FOUND'
+
     def logout(uuid):
         try:
             db.cur.execute("UPDATE pfyt_accounts.auth SET TOKEN_SECRET = NULL WHERE UUID = %s", (uuid,))

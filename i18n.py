@@ -24,12 +24,14 @@ class savedata():
     created = "Written Server files successfully."
     created_new = "Created Server folder successfully."
     data_exists = "Previous Installation Detected! Please delete the files or choose another folder."
+
 class database():
     host = 'Enter MySQL/MariaDB Server IP Address: '
     port = 'Enter MySQL/MariaDB Server Port (leave blank for 3306): '
     user = 'Enter Username of user with CREATE privilege: '
     passwd = 'Enter Password of the user: '
     creds_not_found = "Could not find database credentials. Rerunning server configuration process"
+    de_cred_fail = "Error while decrypting database credentials. Check your password\n{}"
 
 class password():
     explain = "The server's 'Launch Password' is used to encrypt credentials.\n\
@@ -43,6 +45,24 @@ class log():
         info = '[INFO] '
         warn = '[WARN] '
         error = '[ERR] '
+        debug = '[DEBUG] '
     class conn():
-        disconnected = "Client {0} disconnected due to:\n\t{1}"        
+        attempt = "Remote {0} attempted connection"
+        init = "Remote {0} initiated connection with UUID: {1}"
+        disconnected = "Client {0} disconnected due to:\n\t{1}"
+        db_conn_success = "Connected to database {0}:{1}"
+        db_conn_err = "Could not connect to database: {}"
+    class db():
+        init_success = 'Created schemas successfully'
+        init_fail = 'Failed to create schemas: {}'
+    class packet():
+        pubkey_recv = "Received public key for {}"
+        signup_attempt = "Client {0} attempted SIGNUP with username '{1}'"
+        signup_success = "Account creation successful for '{}'."
+        token_gen = "Generated token for {}"
+        login_success = "User {0} logged in from {1}"
+        logout_success = "User {0} logged out from {1}"
+        captcha_gen = "Generated CAPTCHA for client {0} with code = {1}"
     server_start = "Server starting from path {0}...."
+    server_online = "Server Online!"
+    server_exit = "Goodbye!"
