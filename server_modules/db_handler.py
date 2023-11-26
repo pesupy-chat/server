@@ -4,8 +4,6 @@ import pickle
 from . import encryption as en
 from i18n import log
 
-
-
 initialize_ddl = """DROP SCHEMA IF EXISTS pfyt_accounts;
 CREATE DATABASE IF NOT EXISTS pfyt_accounts;
 CREATE TABLE IF NOT EXISTS pfyt_accounts.users (
@@ -25,10 +23,13 @@ CREATE TABLE IF NOT EXISTS pfyt_accounts.auth (
 
 queries = {'initialize': initialize_ddl}
 fields_to_check = {
-    'username':{'table':'pfyt_accounts.users','attribute':'USERNAME'}}
+    'username': {'table': 'pfyt_accounts.users', 'attribute': 'USERNAME'}}
+
+
 class db:
     con = None
     cur = None
+
 
 def decrypt_creds(fkey, workingdir):
     with open(f'{workingdir}/creds/db', 'rb') as f:
@@ -36,13 +37,14 @@ def decrypt_creds(fkey, workingdir):
     decrypted = fkey.decrypt(data)
     dict = pickle.loads(decrypted)
     try:
-        setattr(db, 'con', sqltor.connect(host = dict['host'], user = dict['user'], passwd = dict['passwd']))
+        setattr(db, 'con', sqltor.connect(host=dict['host'], user=dict['user'], passwd=dict['passwd']))
         setattr(db, 'cur', db.con.cursor())
         if db.con.is_connected():
-            print(log.tags.info + log.conn.db_conn_success.format(dict['host'],dict['port']))
+            print(log.tags.info + log.conn.db_conn_success.format(dict['host'], dict['port']))
             db.cur.execute("USE pfyt_accounts")
     except sqltor.errors.ProgrammingError as errrr:
         print(log.tags.error + log.conn.db_conn_err.format(errrr))
+
 
 def initialize_schemas():
     try:
@@ -54,11 +56,12 @@ def initialize_schemas():
     except Exception as error:
         print(log.tags.error + log.tags.db.init_fail.format(error))
 
+
 def check_if_exists(value, field):
     col = fields_to_check[field]['attribute']
     table = fields_to_check[field]['table']
     db.cur.execute(f"SELECT {col} FROM {table} WHERE {col} = '{value}'")
-    data = db.cur.fetchall() 
+    data = db.cur.fetchall()
     try:
         if data[0][0] == value:
             return True
@@ -66,6 +69,7 @@ def check_if_exists(value, field):
         return False
     else:
         return False
+
 
 def get_uuid(identifier):
     try:
@@ -79,22 +83,24 @@ def get_uuid(identifier):
         return 'ACCOUNT_DNE'
     return uuid
 
+
 def close():
     if db.con is not None:
         db.con.close()
+
 
 class Account(db):
     def create(username, fullname, dob, email, salted_pwd):
         # UUID, USERNAME, FULL_NAME, DOB, EMAIL, CREATION
         uuid = str(uuid4())
         query = "INSERT INTO pfyt_accounts.users(UUID, USERNAME, FULL_NAME, DOB, EMAIL) VALUES (%s, %s, %s, %s, %s)"
-        print(f"[DEBUG | for {uuid}]",query)
+        print(f"[DEBUG | for {uuid}]", query)
         db.cur.execute(query, (uuid, username, fullname, dob, email))
         db.con.commit()
         pwd_query = "INSERT INTO pfyt_accounts.auth(UUID, SALTED_HASHBROWN) VALUES (%s, %s)"
         db.cur.execute(pwd_query, (uuid, salted_pwd))
         db.con.commit()
-    
+
     def check_pwd(pwd, identifier):
         try:
             if '@' not in identifier:
@@ -108,7 +114,7 @@ class Account(db):
         db.cur.execute("SELECT SALTED_HASHBROWN FROM pfyt_accounts.auth WHERE UUID = %s", (uuid,))
         saltedpwd = db.cur.fetchall()[0][0]
         flag = en.db_check_pwd(pwd, saltedpwd)
-        return (flag, uuid)
+        return flag, uuid
 
     def set_token(uuid, secret):
         db.cur.execute("UPDATE pfyt_accounts.auth SET TOKEN_SECRET = %s WHERE UUID = %s", (secret, uuid))

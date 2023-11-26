@@ -2,15 +2,18 @@ import os
 import getpass
 import i18n
 from . import encryption as e
-import pickle 
+import pickle
 from yaml import dump as dumpyaml
-try: 
+
+try:
     from tkinter import filedialog
 except:
     pass
 
+
 class working_dir():
     workingdir = ''
+
 
 def get_server_dir():
     try:
@@ -20,14 +23,16 @@ def get_server_dir():
         print(i18n.savedata.nogui)
         return input().rstrip('/\\')
 
+
 def create_directory(path):
     try:
         os.mkdir(path)
         print(i18n.savedata.created)
-    except OSError as e:
-        print(f"{i18n.savedata.error}:\n{e}")
+    except OSError as err:
+        print(f"{i18n.savedata.error}:\n{err}")
         return False
     return True
+
 
 def setup_server_dir():
     while True:
@@ -50,7 +55,8 @@ def setup_server_dir():
 
     return spath
 
-def save_db_credentials(fkey,workingdir):
+
+def save_db_credentials(fkey, workingdir):
     host = input(i18n.database.host)
     port = input(i18n.database.port)
     user = input(i18n.database.user)
@@ -59,9 +65,10 @@ def save_db_credentials(fkey,workingdir):
     else:
         port = int(port)
     passwd = getpass.getpass(i18n.database.passwd)
-    data = pickle.dumps({'host':host, 'port': port, 'user':user, 'passwd':passwd})
+    data = pickle.dumps({'host': host, 'port': port, 'user': user, 'passwd': passwd})
     with open(f'{workingdir}/creds/db', 'wb') as f:
         f.write(fkey.encrypt(data))
+
 
 def main():
     print(i18n.firstrun.welcome_message)
@@ -76,7 +83,3 @@ def main():
     with open(f'{os.path.dirname(os.path.abspath(__file__))}/../config.yml', 'w') as fi:
         config = {'working_directory': workingdir, 'listen_address': host, 'listen_port': port}
         fi.write(dumpyaml(config))
-
-
-
-

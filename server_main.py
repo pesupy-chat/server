@@ -1,4 +1,5 @@
-import os, sys
+import os
+import sys
 import asyncio
 import websockets
 from server_modules import firstrun
@@ -21,9 +22,9 @@ def execute_firstrun():
     sys.exit()
 
 
-def check_missing_config(f, yaml, config):
+def check_missing_config(f, yamlc, config):
     try:
-        if yaml[config] is None:
+        if yamlc[config] is None:
             print(i18n.firstrun.setting_not_found.format(config))
             if config == 'working_directory':
                 print(i18n.firstrun.ft_question)
@@ -37,22 +38,22 @@ def check_missing_config(f, yaml, config):
                         print(i18n.firstrun.exit)
                         sys.exit()
                     elif choice.lower() == 'n':
-                        fill_missing_config(f, yaml, 'working_directory')
+                        fill_missing_config(f, yamlc, 'working_directory')
                         break
             else:
-                fill_missing_config(f, yaml, config)
+                fill_missing_config(f, yamlc, config)
     except KeyError:
         print(i18n.firstrun.setting_not_found.format(config))
-        fill_missing_config(f, yaml, config)
+        fill_missing_config(f, yamlc, config)
 
 
-def fill_missing_config(f, yaml, config):
+def fill_missing_config(f, yamlc, config):
     print(i18n.firstrun.fix_missing.format(config))
-    yaml[config] = input('\n> ')
+    yamlc[config] = input('\n> ')
     if config in ('listen_port', 'any_other_int_type_config'):
-        yaml[config] = int(yaml[config])
+        yamlc[config] = int(yamlc[config])
     f.seek(0)
-    f.write(dumpyaml(yaml))
+    f.write(dumpyaml(yamlc))
 
 
 async def catch(websocket):
@@ -72,9 +73,9 @@ async def catch(websocket):
         return None
 
 
-async def main(host, port):
+async def main(chost, cport):
     async with websockets.serve(
-            catch, host=host, port=port,
+            catch, host=chost, port=cport,
             ping_interval=120, ping_timeout=None, close_timeout=None,
             max_size=1048576
     ):
