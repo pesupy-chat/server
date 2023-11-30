@@ -93,7 +93,7 @@ async def signup(SESSIONS, SERVER_CREDS, ws, data):
         password = data['password']
     except KeyError as ero:
         return await get_resp_packet(SESSIONS, ws,
-                                     {'type': 'STATUS', 'data': {'sig': 'SIGNUP_MISSING_CREDS', 'desc': ero}})
+                                     {'type': 'STATUS', 'data': {'sig': 'MISSING_CREDS', 'desc': ero}})
     # Define validation rules
     validation_rules = [
         (len(user) > 32, 'SIGNUP_USERNAME_ABOVE_LIMIT'),
@@ -129,11 +129,12 @@ async def login(SESSIONS, SERVER_CREDS, ws, data):
         dont_ask_again = data['save']
     except KeyError as ero:
         return await get_resp_packet(SESSIONS, ws,
-                                     {'type': 'STATUS', 'data': {'sig': 'LOGIN_MISSING_CREDS', 'desc': ero}})
+                                     {'type': 'STATUS', 'data': {'sig': 'MISSING_CREDS', 'desc': ero}})
     resp_captcha = await captcha(SESSIONS, SERVER_CREDS, ws, data)
     if resp_captcha is True:
-        flag, uuid = db.Account.check_pwd(password, identifier)
-        if flag is True:
+        flag = db.Account.check_pwd(password, identifier)
+        if flag[0] is True:
+            uuid = flag[1]
             if dont_ask_again is True:
                 secret, access_token = en.gen_token(uuid, 30)
             else:
@@ -142,10 +143,10 @@ async def login(SESSIONS, SERVER_CREDS, ws, data):
             en_packet = await get_resp_packet(SESSIONS, ws, {'type': 'TOKEN_GEN', 'data': {'token': access_token}})
             print(log.tags.info + log.packet.token_gen.format(uuid))
             return en_packet
-        elif flag is False:
-            return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'LOGIN_INCORRECT_PASSWORD'}})
+        elif flag[0] is False:
+            return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'INCORRECT_PASSWORD'}})
         elif flag == 'ACCOUNT_DNE':
-            return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'LOGIN_ACCOUNT_NOT_FOUND'}})
+            return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'ACCOUNT_NOT_FOUND'}})
     elif resp_captcha is False:
         return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'CAPTCHA_WRONG'}})
 
@@ -157,7 +158,7 @@ async def auth(SESSIONS, SERVER_CREDS, ws, data):
     con_uuid = await identify_client(ws, SESSIONS)
     user_uuid = db.Account.get_uuid(user)
     if user_uuid == 'ACCOUNT_DNE':
-        return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'ACCOUNT_DNE'}})
+        return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'ACCOUNT_NOT_FOUND'}})
     key = db.Account.get_token_key(user_uuid)
     if key == 'TOKEN_NOT_FOUND':
         return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'TOKEN_NOT_FOUND'}})
@@ -195,20 +196,24 @@ async def delete(SESSIONS, SERVER_CREDS, ws, data):
         password = data['password']
     except KeyError as ero:
         return await get_resp_packet(SESSIONS, ws,
-                                     {'type': 'STATUS', 'data': {'sig': 'ACC_DELETE_MISSING_CREDS', 'desc': ero}})
+                                     {'type': 'STATUS', 'data': {'sig': 'MISSING_CREDS', 'desc': ero}})
     resp_captcha = await captcha(SESSIONS, SERVER_CREDS, ws, data)
     if resp_captcha is True:
-        flag, uuid = db.Account.check_pwd(password, identifier)
-        if flag is True:
-            user = db.Account.get_uuid(identifier)
+        print("DEBUG - True")
+        flag = db.Account.check_pwd(password, identifier)
+        print("DEBUG - Passwd check")
+        if flag[0] is True:
+            user = flag[1]
+            print("DEBUG - identifier to uuid")
             dflag = db.Account.delete(user)
+            print("DEBUG - delete complete")
             if dflag == 'SUCCESS':
                 print(log.tags.info + log.packet.acc_delete.format(identifier))
-                return get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'ACC_DELETE_SUCCESS'}})
+                return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'ACC_DELETE_SUCCESS'}})
             elif dflag == 'FAILURE':
-                return get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'ACC_DELETE_ERR'}})
-        elif flag is False:
-            return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'ACC_DELETE_INCORRECT_PASSWORD'}})
+                return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'ACC_DELETE_ERR'}})
+        elif flag[0] is False:
+            return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'INCORRECT_PASSWORD'}})
         elif flag == 'ACCOUNT_DNE':
             return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'DELETE_NONEXISTENT_ACCOUNT'}})
     elif resp_captcha is False:

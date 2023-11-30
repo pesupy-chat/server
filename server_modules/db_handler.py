@@ -15,15 +15,11 @@ CREATE TABLE IF NOT EXISTS pfyt_accounts.users (
     CREATION timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS pfyt_accounts.auth (
-    UUID char(36) NOT NULL REFERENCES pfyt_accounts.users(UUID) ON DELETE CASCADE ON UPDATE CASCADE, 
+    UUID char(36) NOT NULL REFERENCES pfyt_accounts.users(UUID) ON DELETE CASCADE, 
     SALTED_HASHBROWN blob NOT NULL, 
     TOKEN_SECRET tinytext
 );
 """
-
-queries = {'initialize': initialize_ddl}
-fields_to_check = {
-    'username': {'table': 'pfyt_accounts.users', 'attribute': 'USERNAME'}}
 
 
 class db:
@@ -48,19 +44,17 @@ def decrypt_creds(fkey, workingdir):
 
 def initialize_schemas():
     try:
-        query = queries['initialize'].rstrip(';').split(';\n')
+        query = initialize_ddl.rstrip(';').split(';\n')
         for i in query:
             db.cur.execute(i)
             db.con.commit()
-        print(log.tags.info + log.tags.db.init_success)
+        print(log.tags.info + log.db.init_success)
     except Exception as error:
-        print(log.tags.error + log.tags.db.init_fail.format(error))
+        print(log.tags.error + log.db.init_fail.format(error))
 
 
 def check_if_exists(value, field):
-    col = fields_to_check[field]['attribute']
-    table = fields_to_check[field]['table']
-    db.cur.execute(f"SELECT {col} FROM {table} WHERE {col} = '{value}'")
+    db.cur.execute(f"SELECT USERNAME FROM pfyt_accounts.users WHERE USERNAME = %s", (value,))
     data = db.cur.fetchall()
     try:
         if data[0][0] == value:
@@ -135,7 +129,6 @@ class Account(db):
     def delete(uuid):
         try:
             db.cur.execute("DELETE FROM pfyt_accounts.users WHERE UUID = %s", (uuid,))
-            db.cur.execute("DELETE FROM pfyt_accounts.auth WHERE UUID = %s", (uuid,))
             db.con.commit()
             return 'SUCCESS'
         except Exception as err:
