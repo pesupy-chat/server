@@ -70,20 +70,6 @@ def check_if_exists(value, field):
     else:
         return False
 
-
-def get_uuid(identifier):
-    try:
-        if '@' not in identifier:
-            db.cur.execute("SELECT UUID FROM pfyt_accounts.users WHERE USERNAME=%s", (identifier,))
-            uuid = db.cur.fetchall()[0][0]
-        elif '@' in identifier:
-            db.cur.execute("SELECT UUID FROM pfyt_accounts.users WHERE EMAIL=%s", (identifier,))
-            uuid = db.cur.fetchall()[0][0]
-    except IndexError:
-        return 'ACCOUNT_DNE'
-    return uuid
-
-
 def close():
     if db.con is not None:
         db.con.close()
@@ -101,7 +87,7 @@ class Account(db):
         db.cur.execute(pwd_query, (uuid, salted_pwd))
         db.con.commit()
 
-    def check_pwd(pwd, identifier):
+    def get_uuid(identifier):
         try:
             if '@' not in identifier:
                 db.cur.execute("SELECT UUID FROM pfyt_accounts.users WHERE USERNAME=%s", (identifier,))
@@ -110,6 +96,12 @@ class Account(db):
                 db.cur.execute("SELECT UUID FROM pfyt_accounts.users WHERE EMAIL=%s", (identifier,))
                 uuid = db.cur.fetchall()[0][0]
         except IndexError:
+            return 'ACCOUNT_DNE'
+        return uuid
+
+    def check_pwd(pwd, identifier):
+        uuid = Account.get_uuid(identifier)
+        if uuid == 'ACCOUNT_DNE':
             return 'ACCOUNT_DNE'
         db.cur.execute("SELECT SALTED_HASHBROWN FROM pfyt_accounts.auth WHERE UUID = %s", (uuid,))
         saltedpwd = db.cur.fetchall()[0][0]
@@ -137,5 +129,15 @@ class Account(db):
             db.con.commit()
             return 'SUCCESS'
         except Exception as err:
-            print(err)
+            print(log.tags.error + "LOGOUT_DB_ERROR:", err)
+            return 'FAILURE'
+    
+    def delete(uuid):
+        try:
+            db.cur.execute("DELETE FROM pfyt_accounts.users WHERE UUID = %s", (uuid,))
+            db.cur.execute("DELETE FROM pfyt_accounts.auth WHERE UUID = %s", (uuid,))
+            db.con.commit()
+            return 'SUCCESS'
+        except Exception as err:
+            print(log.tags.error + "ACC_DELETE_DB_ERROR:", err)
             return 'FAILURE'

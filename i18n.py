@@ -71,6 +71,7 @@ class log:
         login_success = "User {0} logged in from {1}"
         logout_success = "User {0} logged out from {1}"
         captcha_gen = "Generated CAPTCHA for client {0} with code = {1}"
+        acc_delete = "Account deletion successful for '{}'."
     server_start = "Server starting from path {0}...."
     server_online = "Server Online!"
     server_exit = "Goodbye!"

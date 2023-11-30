@@ -155,7 +155,7 @@ async def auth(SESSIONS, SERVER_CREDS, ws, data):
     user = data['user']
     token = data['token']
     con_uuid = await identify_client(ws, SESSIONS)
-    user_uuid = db.get_uuid(user)
+    user_uuid = db.Account.get_uuid(user)
     if user_uuid == 'ACCOUNT_DNE':
         return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'ACCOUNT_DNE'}})
     key = db.Account.get_token_key(user_uuid)
@@ -189,6 +189,32 @@ async def logout(SESSIONS, SERVER_CREDS, ws, data):
         return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'LOGOUT_ERR'}})
 
 
+async def delete(SESSIONS, SERVER_CREDS, ws, data):
+    try:
+        identifier = data['id']
+        password = data['password']
+    except KeyError as ero:
+        return await get_resp_packet(SESSIONS, ws,
+                                     {'type': 'STATUS', 'data': {'sig': 'ACC_DELETE_MISSING_CREDS', 'desc': ero}})
+    resp_captcha = await captcha(SESSIONS, SERVER_CREDS, ws, data)
+    if resp_captcha is True:
+        flag, uuid = db.Account.check_pwd(password, identifier)
+        if flag is True:
+            user = db.Account.get_uuid(identifier)
+            dflag = db.Account.delete(user)
+            if dflag == 'SUCCESS':
+                print(log.tags.info + log.packet.acc_delete.format(identifier))
+                return get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'ACC_DELETE_SUCCESS'}})
+            elif dflag == 'FAILURE':
+                return get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'ACC_DELETE_ERR'}})
+        elif flag is False:
+            return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'ACC_DELETE_INCORRECT_PASSWORD'}})
+        elif flag == 'ACCOUNT_DNE':
+            return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'DELETE_NONEXISTENT_ACCOUNT'}})
+    elif resp_captcha is False:
+        return await get_resp_packet(SESSIONS, ws, {'type': 'STATUS', 'data': {'sig': 'CAPTCHA_WRONG'}})
+
+
 async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     uuid = await identify_client(ws, SESSIONS)
     challenge = str(randint(100000, 999999))
@@ -206,15 +232,12 @@ async def captcha(SESSIONS, SERVER_CREDS, ws, data):
     return int(de_resp) == int(challenge)
 
 
-upacket_map = {
-    'CONN_INIT': 1,
-    'CONN_ENCRYPT_C': 2
-}
 packet_map = {
     'SIGNUP': signup,
     'LOGIN': login,
     'AUTH_TOKEN': auth,
-    'LOGOUT': logout
+    'LOGOUT': logout,
+    'DELETE': delete
 }
 
 
