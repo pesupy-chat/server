@@ -1,4 +1,4 @@
-from cryptography.hazmat.primitives import serialization, hashes, hmac
+from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import padding as spadding
@@ -35,6 +35,7 @@ def fernet_initkey(workingdir):
             break
         else:
             print(i18n.password.retry)
+
     # Generate a Fernet key with the password and save the salt
     salt = urandom(16)
     with open(f"{workingdir}/creds/salt", "wb") as f:
@@ -50,7 +51,7 @@ def fernet_initkey(workingdir):
     return key
 
 
-def fermat_gen(workingdir):
+def fernet_gen(workingdir):
     passwd = getpass("Enter Password: ")
     with open(f"{workingdir}/creds/salt", "rb") as f:
         salt = f.read()
@@ -98,11 +99,14 @@ def encrypt_packet(data, pubkey):
             label=None,
         ),
     )
+
     # Encrypt packet data with symmetric key
     cbc = urandom(16)
+
     # Add the padding to the data
     padder = spadding.PKCS7(algorithms.AES.block_size).padder()
     padded_data = padder.update(data) + padder.finalize()
+
     # Encrypting the padded_data
     cipher = Cipher(algorithms.AES(skey), modes.CBC(cbc))
     encryptor = cipher.encryptor()

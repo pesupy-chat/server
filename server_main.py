@@ -14,7 +14,7 @@ from yaml import dump as dumpyaml
 def execute_firstrun():
     firstrun.main()
     print(i18n.firstrun.security)
-    db.decrypt_creds(en.fermat_gen(firstrun.working_dir.workingdir), firstrun.working_dir.workingdir)
+    db.decrypt_creds(en.fernet_gen(firstrun.working_dir.workingdir), firstrun.working_dir.workingdir)
     print(i18n.firstrun.initialize_db)
     db.initialize_schemas()
     db.close()
@@ -112,7 +112,7 @@ if __name__ == "__main__":
     host, port = yaml['listen_address'], yaml['listen_port']
 
     try:
-        fkey = en.fermat_gen(workingdir)
+        fkey = en.fernet_gen(workingdir)
         db.decrypt_creds(fkey, workingdir)
     except Exception as w:
         print(i18n.database.de_cred_fail.format(w))
