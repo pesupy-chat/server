@@ -22,30 +22,52 @@ def execute_firstrun():
     sys.exit()
 
 
-def check_missing_config(f, yamlc, config):
-    try:
-        if yamlc[config] is None:
-            print(i18n.firstrun.setting_not_found.format(config))
-            if config == 'working_directory':
-                print(i18n.firstrun.ft_question)
-                while True:
-                    choice = input("(Y / N) > ")
-                    if choice.lower() == 'y':
-                        print(i18n.firstrun.exec)
-                        f.close()
-                        os.remove(f'{rootdir}/config.yml')
-                        firstrun.main()
-                        print(i18n.firstrun.exit)
-                        sys.exit()
-                    elif choice.lower() == 'n':
-                        fill_missing_config(f, yamlc, 'working_directory')
-                        break
-            else:
-                fill_missing_config(f, yamlc, config)
-    except KeyError:
-        print(i18n.firstrun.setting_not_found.format(config))
-        fill_missing_config(f, yamlc, config)
+# def check_missing_config(f, yamlc, config):
+#     try:
+#         if yamlc[config] is None:
+#             print(i18n.firstrun.setting_not_found.format(config))
+#             if config == 'working_directory':
+#                 print(i18n.firstrun.ft_question)
+#                 while True:
+#                     choice = input("(Y / N) > ")
+#                     if choice.lower() == 'y':
+#                         print(i18n.firstrun.exec)
+#                         f.close()
+#                         os.remove(f'{rootdir}/config.yml')
+#                         firstrun.main()
+#                         print(i18n.firstrun.exit)
+#                         sys.exit()
+#                     elif choice.lower() == 'n':
+#                         fill_missing_config(f, yamlc, 'working_directory')
+#                         break
+#             else:
+#                 fill_missing_config(f, yamlc, config)
+#     except KeyError:
+#         print(i18n.firstrun.setting_not_found.format(config))
+#         fill_missing_config(f, yamlc, config)
 
+def check_missing_config(file, yaml_config, config_key):
+    if yaml_config.get(config_key) is not None:
+        return
+    print(i18n.firstrun.setting_not_found.format(config_key))
+
+    if config_key != 'working_directory':
+        fill_missing_config(file, yaml_config, config_key)
+        return
+    print(i18n.firstrun.ft_question)
+
+    while True:
+        choice = input("(Y / N) > ").lower()
+        if choice == 'y':
+            print(i18n.firstrun.exec)
+            file.close()
+            os.remove(f'{rootdir}/config.yml')
+            firstrun.main()
+            print(i18n.firstrun.exit)
+            sys.exit()
+        elif choice == 'n':
+            fill_missing_config(file, yaml_config, 'working_directory')
+            break
 
 def fill_missing_config(f, yamlc, config):
     print(i18n.firstrun.fix_missing.format(config))
