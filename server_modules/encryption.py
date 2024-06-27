@@ -48,7 +48,7 @@ def fernet_initkey(workingdir):
     key = Fernet(key)
     return key
 
-def fermat_gen(workingdir):
+def fernet_gen(workingdir):
     passwd = getpass("Enter Password: ")
     with open(f"{workingdir}/creds/salt", "rb") as f:
         salt = f.read()
